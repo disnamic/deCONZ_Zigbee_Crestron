@@ -1,0 +1,221 @@
+/*
+  DeConz_Group_Control_Wrapper_v4.0.usp
+  SIMPL+ Wrapper for DeConzGroupControl (SIMPL# class)
+
+  Controls one to four deCONZ light groups simultaneously via HTTP PUT.
+  Group IDs are set at runtime via analog inputs – no fixed configuration.
+  Set Group_ID_2/3/4 to 0 to disable those slots.
+
+  State feedback is fetched from the primary group (Group_ID) only.
+
+  DIGITAL INPUTS (1 param → 1 SKIP)
+    _SKIP_,
+    Set_On          Pulse → {"on":true}
+    Set_Off         Pulse → {"on":false}
+    Toggle          Pulse → {"toggle":true}
+    Get_State       Pulse → HTTP GET primary group
+    Delete_Group    Pulse → HTTP DELETE primary group (Group_ID)
+    Create_Group    Pulse → HTTP POST create new group (uses New_Group_Name)
+    Set_Name        Pulse → rename primary group (uses New_Group_Name)
+    Set_Members     Pulse → set group members (uses Members_In, e.g. "3,42,43")
+    Get_All_Groups  Pulse → HTTP GET all groups → all_groups_fb
+    Alert_Select    Pulse → blink short
+    Alert_Long      Pulse → blink long
+    Alert_None      Pulse → stop alert
+    Effect_Colorloop Pulse → colorloop
+    Effect_None     Pulse → stop effect
+    Enable_Raw_Json High  → raw_json_out active
+    Enable_Debug    High  → debug on Debug$
+
+  ANALOG INPUTS (1 param → 1 SKIP)
+    _SKIP_,
+    Group_ID        Primary group to control (required, 0=none)
+    Group_ID_2      Optional second group (0=disabled)
+    Group_ID_3      Optional third group  (0=disabled)
+    Group_ID_4      Optional fourth group (0=disabled)
+    Brightness_In   0-254
+    Colortemp_In    Kelvin (e.g. 2700, 4000, 6500)
+    Hue_In          0-65535
+    Sat_In          0-254
+    Transitiontime  1/10 seconds (0=immediate)
+
+  DIGITAL OUTPUTS (1 param → 1 SKIP)
+    _SKIP_,
+    all_on_fb       1 = all lights in group on
+    any_on_fb       1 = at least one light on
+    Delete_success_fb    200ms pulse on successful DELETE
+    Create_success_fb    200ms pulse on successful CREATE
+    Set_Attr_success_fb  200ms pulse on successful rename or set-members
+    New_Group_Id_fb      ID of newly created group
+
+  ANALOG OUTPUTS (1 param → 1 SKIP)
+    _SKIP_,
+    Brightness_fb   last group brightness 0-254
+    Colortemp_fb    last group colortemp in Kelvin
+
+  STRING OUTPUTS (1 param → 1 SKIP)
+    _SKIP_,
+    Colormode_fb    "hs" / "xy" / "ct"
+    group_name_fb   name of primary group
+    members_fb      comma-separated light IDs "3,42,43"
+    scenes_fb       "1:warmlight,2:reading"
+    raw_json_out    full GET response (when Enable_Raw_Json high)
+    Debug$
+
+  PARAMETERS
+    API_Key         deCONZ API key
+
+  Programmer : martin@disnamic.com
+*/
+
+#SYMBOL_NAME "DeConz_Group_Control v4.0"
+#CATEGORY "46" "DeConZ_Zigbee"
+
+#DEFAULT_VOLATILE
+#ENABLE_STACK_CHECKING
+#ENABLE_TRACE
+
+#HELP_BEGIN
+  DeConz Group Control v4.0
+  ---------------------------
+  Controls 1-4 deCONZ light groups simultaneously.
+  Set Group_ID at runtime (analog input). Optional Group_ID_2/3/4 for
+  broadcasting the same command to multiple groups (0 = disabled).
+
+  Transitiontime: fade duration in 1/10 seconds. Set before issuing a
+  brightness or color command. 0 = immediate.
+
+  State feedback (all_on_fb, any_on_fb, Brightness_fb etc.) is read from
+  the primary group only (Group_ID). Pulse Get_State to refresh.
+#HELP_END
+
+#USER_SIMPLSHARP_LIBRARY "DeConzZigbee"
+
+/*****
+  I/O Declarations – 1 parameter → 1 _SKIP_
+*/
+DIGITAL_INPUT  _SKIP_,
+               Set_On, Set_Off, Toggle, _SKIP_,
+               Get_State, Delete_Group, _SKIP_,
+               Create_Group, Set_Name, Set_Members, Get_All_Groups, _SKIP_,
+               Alert_Select, Alert_Long, Alert_None, _SKIP_,
+               Effect_Colorloop, Effect_None, _SKIP_,
+               Enable_Raw_Json, Enable_Debug;
+
+STRING_INPUT   New_Group_Name[32], Members_In[256];
+
+ANALOG_INPUT   Group_ID, Group_ID_2, Group_ID_3, Group_ID_4, _SKIP_,
+               Brightness_In, Colortemp_In,
+               Hue_In, Sat_In, Transitiontime;
+
+DIGITAL_OUTPUT _SKIP_,
+               all_on_fb, any_on_fb, _SKIP_,
+               Delete_success_fb, Create_success_fb,
+               Set_Attr_success_fb;
+
+ANALOG_OUTPUT  Brightness_fb, Colortemp_fb,
+               New_Group_Id_fb;
+
+STRING_OUTPUT  Colormode_fb, group_name_fb,
+               members_fb, scenes_fb,
+               all_groups_fb, raw_json_out, Debug$;
+
+/*****
+  Parameters
+*/
+STRING_PARAMETER API_Key[40];
+
+#BEGIN_PARAMETER_PROPERTIES API_Key
+  propValidUnits       = unitString;
+  propDefaultValue     = "";
+  propShortDescription = "deCONZ API key (Phoscon App → Settings → Gateway → Advanced)";
+#END_PARAMETER_PROPERTIES
+
+/*****
+  SIMPL# Object
+*/
+DeConzGroupControl myGroup;
+
+/*****
+  Delegate Callbacks
+*/
+CALLBACK FUNCTION CB_AllOn(INTEGER v)      { all_on_fb     = v; }
+CALLBACK FUNCTION CB_AnyOn(INTEGER v)       { any_on_fb        = v; }
+CALLBACK FUNCTION CB_DeleteSuccess(INTEGER v) { Delete_success_fb   = v; }
+CALLBACK FUNCTION CB_CreateSuccess(INTEGER v) { Create_success_fb   = v; }
+CALLBACK FUNCTION CB_NewGroupId(INTEGER v)    { New_Group_Id_fb     = v; }
+CALLBACK FUNCTION CB_SetAttrSuccess(INTEGER v){ Set_Attr_success_fb = v; }
+CALLBACK FUNCTION CB_AllGroups(STRING s)      { all_groups_fb       = s; }
+CALLBACK FUNCTION CB_BrightnessFb(INTEGER v){ Brightness_fb = v; }
+CALLBACK FUNCTION CB_ColortempFb(INTEGER v) { Colortemp_fb  = v; }
+CALLBACK FUNCTION CB_Colormode(STRING s)   { Colormode_fb  = s; }
+CALLBACK FUNCTION CB_GroupName(STRING s)   { group_name_fb = s; }
+CALLBACK FUNCTION CB_Members(STRING s)     { members_fb    = s; }
+CALLBACK FUNCTION CB_Scenes(STRING s)      { scenes_fb     = s; }
+CALLBACK FUNCTION CB_RawJson(STRING s)     { raw_json_out  = s; }
+CALLBACK FUNCTION CB_Debug(STRING s)       { Debug$        = s; }
+
+/*****
+  Input Handlers
+*/
+PUSH Set_On    { myGroup.SetOn();  }
+PUSH Set_Off   { myGroup.SetOff(); }
+PUSH Toggle    { myGroup.Toggle(); }
+PUSH Get_State    { myGroup.GetState();    }
+PUSH Delete_Group   { myGroup.DeleteGroup(); }
+PUSH Create_Group   { myGroup.CreateGroup(); }
+PUSH Set_Name       { myGroup.SetName();     }
+PUSH Set_Members    { myGroup.SetMembers();  }
+PUSH Get_All_Groups { myGroup.GetAllGroups(); }
+
+PUSH Alert_Select { myGroup.AlertSelect(); }
+PUSH Alert_Long   { myGroup.AlertLong();   }
+PUSH Alert_None   { myGroup.AlertNone();   }
+
+PUSH Effect_Colorloop { myGroup.EffectColorloop(); }
+PUSH Effect_None      { myGroup.EffectNone();      }
+
+CHANGE Enable_Raw_Json { myGroup.SetRawJsonEnabled(Enable_Raw_Json); }
+CHANGE Enable_Debug    { myGroup.SetDebug(Enable_Debug); }
+
+CHANGE New_Group_Name { myGroup.SetNewGroupName(New_Group_Name); }
+CHANGE Members_In     { myGroup.SetMembersIn(Members_In);       }
+
+THREADSAFE CHANGE Group_ID  { myGroup.SetGroupId(Group_ID);   }
+THREADSAFE CHANGE Group_ID_2 { myGroup.SetGroupId2(Group_ID_2); }
+THREADSAFE CHANGE Group_ID_3 { myGroup.SetGroupId3(Group_ID_3); }
+THREADSAFE CHANGE Group_ID_4 { myGroup.SetGroupId4(Group_ID_4); }
+
+THREADSAFE CHANGE Brightness_In { myGroup.SetBrightness(Brightness_In); }
+THREADSAFE CHANGE Colortemp_In  { myGroup.SetColortemp(Colortemp_In);  }
+THREADSAFE CHANGE Hue_In        { myGroup.SetHue(Hue_In);              }
+THREADSAFE CHANGE Sat_In        { myGroup.SetSat(Sat_In);              }
+THREADSAFE CHANGE Transitiontime { myGroup.SetTransitiontime(Transitiontime); }
+
+/*****
+  Main
+*/
+Function Main()
+{
+  WaitForInitializationComplete();
+
+  RegisterDelegate(myGroup, OnAllOnFb,      CB_AllOn);
+  RegisterDelegate(myGroup, OnAnyOnFb,        CB_AnyOn);
+  RegisterDelegate(myGroup, OnDeleteSuccessFb,  CB_DeleteSuccess);
+  RegisterDelegate(myGroup, OnCreateSuccessFb,  CB_CreateSuccess);
+  RegisterDelegate(myGroup, OnNewGroupIdFb,     CB_NewGroupId);
+  RegisterDelegate(myGroup, OnSetAttrSuccessFb, CB_SetAttrSuccess);
+  RegisterDelegate(myGroup, OnAllGroupsFb,      CB_AllGroups);
+  RegisterDelegate(myGroup, OnBrightnessFb, CB_BrightnessFb);
+  RegisterDelegate(myGroup, OnColortempFb,  CB_ColortempFb);
+  RegisterDelegate(myGroup, OnColormodeFb,  CB_Colormode);
+  RegisterDelegate(myGroup, OnGroupNameFb,  CB_GroupName);
+  RegisterDelegate(myGroup, OnMembersFb,    CB_Members);
+  RegisterDelegate(myGroup, OnScenesFb,     CB_Scenes);
+  RegisterDelegate(myGroup, OnRawJsonFb,    CB_RawJson);
+  RegisterDelegate(myGroup, OnDebugOut,     CB_Debug);
+
+  myGroup.SetRawJsonEnabled(Enable_Raw_Json);
+  myGroup.SetDebug(Enable_Debug);
+  myGroup.Initialize(API_Key);
+}

@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  DeConzZigbee.csproj
+  Crestron SIMPL# Library project file.
+
+  Build output: DeConzZigbee.clz
+  Copy the .clz to your SIMPL Windows project folder alongside the .usp wrappers.
+
+  Requirements:
+    - Crestron.SimplSharp.SDK.Library NuGet package (v2.21.252), restored via packages.config
+    - .NET Framework 4.8
+
+  Notes:
+    - The SDK package ships only build\Crestron.SimplSharp.SDK.Library.targets
+      (the CLZ archiver). It does NOT inject assembly references, so the
+      SimplSharp interface assemblies are referenced explicitly via HintPath
+      below (packages.config + HintPaths convention).
+    - <Private>False</Private> keeps the interface DLLs out of the .clz; they are
+      provided by the processor firmware at runtime.
+    - lib\net47 is reference-compatible with a v4.8 target (the package has no
+      net48 folder).
+    - Packages restore to the solution-level packages\ folder (next to the .sln),
+      hence the ..\packages\ paths.
+-->
+<Project ToolsVersion="14.0" DefaultTargets="Build"
+         xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>DeConzZigbee</RootNamespace>
+    <AssemblyName>DeConzZigbee</AssemblyName>
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="SimplSharpHelperInterface">
+      <HintPath>..\packages\Crestron.SimplSharp.SDK.Library.2.21.252\lib\net47\SimplSharpHelperInterface.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="SimplSharpCustomAttributesInterface">
+      <HintPath>..\packages\Crestron.SimplSharp.SDK.Library.2.21.252\lib\net47\SimplSharpCustomAttributesInterface.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="SimplSharpReflectionInterface">
+      <HintPath>..\packages\Crestron.SimplSharp.SDK.Library.2.21.252\lib\net47\SimplSharpReflectionInterface.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+    <Reference Include="SimplSharpProgrammingInterfaces">
+      <HintPath>..\packages\Crestron.SimplSharp.SDK.Library.2.21.252\lib\net47\SimplSharpProgrammingInterfaces.dll</HintPath>
+      <Private>False</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="DeConzBroker.cs" />
+    <Compile Include="DeConzJsonParser.cs" />
+    <Compile Include="DeConzWebSocketClient.cs" />
+    <Compile Include="DeConzDevice.cs" />
+    <Compile Include="DeConzKeypad.cs" />
+    <Compile Include="DeConzLightWs.cs" />
+    <Compile Include="DeConzValve.cs" />
+    <Compile Include="DeConzShade.cs" />
+    <Compile Include="DeConzThermostat.cs" />
+    <Compile Include="DeConzClimate.cs" />
+    <Compile Include="DeConzContact.cs" />
+    <Compile Include="DeConzGroupControl.cs" />
+    <Compile Include="DeConzScene.cs" />
+    <Compile Include="DeConzMotion.cs" />
+    <Compile Include="DeConzPower.cs" />
+    <Compile Include="DeConzAlarm.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="packages.config" />
+  </ItemGroup>
+
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+
+  <Import Project="..\packages\Crestron.SimplSharp.SDK.Library.2.21.252\build\Crestron.SimplSharp.SDK.Library.targets" Condition="Exists('..\packages\Crestron.SimplSharp.SDK.Library.2.21.252\build\Crestron.SimplSharp.SDK.Library.targets')" />
+
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>This project references NuGet package(s) that are missing on this computer. Use NuGet Package Restore to download them. The missing file is {0}.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('..\packages\Crestron.SimplSharp.SDK.Library.2.21.252\build\Crestron.SimplSharp.SDK.Library.targets')" Text="$([System.String]::Format('$(ErrorText)', '..\packages\Crestron.SimplSharp.SDK.Library.2.21.252\build\Crestron.SimplSharp.SDK.Library.targets'))" />
+  </Target>
+
+</Project>

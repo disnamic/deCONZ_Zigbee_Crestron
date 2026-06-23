@@ -1,0 +1,178 @@
+/*
+  DeConz_Keypad_Wrapper_v4.0.usp
+  SIMPL+ Wrapper for DeConzKeypad (SIMPL# class)
+
+  Zigbee keypad / remote receiver.
+  Feedback via WebSocket events (DeConzBroker) – no signal wiring to Gateway needed.
+  State polled via HTTP GET on connect/reconnect (random 1-15 s delay) and every 30 min.
+
+  DIGITAL INPUTS
+    Get_State               Pulse → HTTP GET immediate state refresh
+    Enable_Debug            High  → debug on Debug$
+
+  DIGITAL OUTPUTS
+    online                  1 = alive within Online_Timeout_Seconds
+    Battery_low             1 = low battery
+    Button_short_release_fb[1..N]   500 ms pulse
+    Button_hold_fb[1..N]            500 ms pulse
+    Button_long_release_fb[1..N]    500 ms pulse
+    Button_double_press_fb[1..N]    500 ms pulse
+
+  ANALOG OUTPUTS
+    Battery_state           0-100 %
+
+  STRING OUTPUTS
+    LastAnnounced_fb        ISO timestamp
+    LastSeen_fb             ISO timestamp
+    Manufacturer_fb         manufacturername
+    ModelId_fb              modelid
+    Name_fb                 name
+    SwVersion_fb            swversion
+    Type_fb                 type
+    raw_json_out            Last JSON payload
+    Debug$
+
+  PARAMETERS
+    API_Key                 deCONZ API key
+    Device_UniqueID         Zigbee uniqueid
+    Number_of_Buttons       1-10
+    Online_Timeout_Seconds  Default 120
+
+  Programmer : martin@disnamic.com
+*/
+
+#SYMBOL_NAME "DeConz_Keypad v4.0"
+#CATEGORY "46" "DeConZ_Zigbee"
+
+#DEFINE_CONSTANT MAXBUTTONS 10
+
+#DEFAULT_VOLATILE
+#ENABLE_STACK_CHECKING
+#ENABLE_TRACE
+
+#HELP_BEGIN
+  DeConz Keypad v4.0
+  --------------------
+  Zigbee remote / keypad (1-10 buttons).
+  State polled on WS connect and every 30 minutes automatically.
+  Pulse Get_State for an immediate refresh.
+#HELP_END
+
+#USER_SIMPLSHARP_LIBRARY "DeConzZigbee"
+
+DIGITAL_INPUT  _SKIP_, _SKIP_, _SKIP_, _SKIP_, Get_State, Enable_Debug, Enable_Raw_Json;
+
+DIGITAL_OUTPUT _SKIP_,_SKIP_,_SKIP_,_SKIP_, online, Battery_low;
+DIGITAL_OUTPUT Button_short_release_fb[MAXBUTTONS];
+DIGITAL_OUTPUT _SKIP_,Button_hold_fb[MAXBUTTONS];
+DIGITAL_OUTPUT _SKIP_,Button_long_release_fb[MAXBUTTONS];
+DIGITAL_OUTPUT _SKIP_,Button_double_press_fb[MAXBUTTONS];
+
+ANALOG_OUTPUT  Battery_state;
+
+STRING_OUTPUT  LastAnnounced_fb, LastSeen_fb,
+               Manufacturer_fb, ModelId_fb, Name_fb,
+               SwVersion_fb, Type_fb,_SKIP_,
+               raw_json_out, Debug$;
+
+STRING_PARAMETER  API_Key[64], Device_UniqueID[64];
+INTEGER_PARAMETER Number_of_Buttons, Online_Timeout_Seconds;
+
+#BEGIN_PARAMETER_PROPERTIES API_Key
+  propValidUnits       = unitString;
+  propDefaultValue     = "";
+  propShortDescription = "deCONZ API key (Phoscon App → Settings → Gateway → Advanced)";
+#END_PARAMETER_PROPERTIES
+
+#BEGIN_PARAMETER_PROPERTIES Device_UniqueID
+  propValidUnits       = unitString;
+  propDefaultValue     = "00:00:00:00:00:00:00:00-00";
+  propShortDescription = "Zigbee uniqueid (Phoscon App → Sensors → device → Advanced)";
+#END_PARAMETER_PROPERTIES
+
+#BEGIN_PARAMETER_PROPERTIES Number_of_Buttons
+  propValidUnits  = unitDecimal;
+  propDefaultUnit = unitDecimal;
+  propDefaultValue = 2d;
+  propList = { 1d, "1 Button" },  { 2d, "2 Buttons" }, { 3d, "3 Buttons" },
+             { 4d, "4 Buttons" }, { 5d, "5 Buttons" }, { 6d, "6 Buttons" },
+             { 7d, "7 Buttons" }, { 8d, "8 Buttons" }, { 9d, "9 Buttons" },
+             { 10d, "10 Buttons" };
+  propShortDescription = "Number of physical buttons on this device";
+#END_PARAMETER_PROPERTIES
+
+#BEGIN_PARAMETER_PROPERTIES Online_Timeout_Seconds
+  propValidUnits       = unitDecimal;
+  propDefaultUnit      = unitDecimal;
+  propDefaultValue     = 120d;
+  propShortDescription = "Offline timeout in seconds (default 120)";
+#END_PARAMETER_PROPERTIES
+
+
+DeConzKeypad myKeypad;
+
+CALLBACK FUNCTION CB_Online(INTEGER v)      { online        = v; }
+CALLBACK FUNCTION CB_BatteryLow(INTEGER v)  { Battery_low   = v; }
+CALLBACK FUNCTION CB_BatteryLevel(INTEGER v){ Battery_state = v; }
+
+CALLBACK FUNCTION CB_ShortRelease(INTEGER btnNum)
+{
+  IF (btnNum >= 1 && btnNum <= MAXBUTTONS)
+    PULSE(50, Button_short_release_fb[btnNum]);
+}
+CALLBACK FUNCTION CB_Hold(INTEGER btnNum)
+{
+  IF (btnNum >= 1 && btnNum <= MAXBUTTONS)
+    PULSE(50, Button_hold_fb[btnNum]);
+}
+CALLBACK FUNCTION CB_LongRelease(INTEGER btnNum)
+{
+  IF (btnNum >= 1 && btnNum <= MAXBUTTONS)
+    PULSE(50, Button_long_release_fb[btnNum]);
+}
+CALLBACK FUNCTION CB_DoublePress(INTEGER btnNum)
+{
+  IF (btnNum >= 1 && btnNum <= MAXBUTTONS)
+    PULSE(50, Button_double_press_fb[btnNum]);
+}
+
+CALLBACK FUNCTION CB_RawJson(STRING s) { raw_json_out = s; }
+CALLBACK FUNCTION CB_Debug(STRING s)   { Debug$       = s; }
+CALLBACK FUNCTION CB_LastAnnounced(STRING s){ LastAnnounced_fb = s; }
+CALLBACK FUNCTION CB_LastSeen(STRING s)     { LastSeen_fb      = s; }
+CALLBACK FUNCTION CB_Manufacturer(STRING s) { Manufacturer_fb  = s; }
+CALLBACK FUNCTION CB_ModelId(STRING s)      { ModelId_fb       = s; }
+CALLBACK FUNCTION CB_Name(STRING s)         { Name_fb          = s; }
+CALLBACK FUNCTION CB_SwVersion(STRING s)    { SwVersion_fb     = s; }
+CALLBACK FUNCTION CB_Type(STRING s)         { Type_fb          = s; }
+
+PUSH Get_State  { myKeypad.GetState(); }
+CHANGE Enable_Debug { myKeypad.SetDebug(Enable_Debug); }
+CHANGE Enable_Raw_Json { myKeypad.SetRawJsonEnabled(Enable_Raw_Json); }
+
+Function Main()
+{
+  WaitForInitializationComplete();
+
+  RegisterDelegate(myKeypad, OnOnline,       CB_Online);
+  RegisterDelegate(myKeypad, OnBatteryLow,   CB_BatteryLow);
+  RegisterDelegate(myKeypad, OnBatteryLevel, CB_BatteryLevel);
+  RegisterDelegate(myKeypad, OnShortRelease, CB_ShortRelease);
+  RegisterDelegate(myKeypad, OnHold,         CB_Hold);
+  RegisterDelegate(myKeypad, OnLongRelease,  CB_LongRelease);
+  RegisterDelegate(myKeypad, OnDoublePress,  CB_DoublePress);
+  RegisterDelegate(myKeypad, OnRawJson,      CB_RawJson);
+  RegisterDelegate(myKeypad, OnDebugOut,     CB_Debug);
+  RegisterDelegate(myKeypad, OnLastAnnouncedFb, CB_LastAnnounced);
+  RegisterDelegate(myKeypad, OnLastSeenFb,      CB_LastSeen);
+  RegisterDelegate(myKeypad, OnManufacturerFb,  CB_Manufacturer);
+  RegisterDelegate(myKeypad, OnModelIdFb,       CB_ModelId);
+  RegisterDelegate(myKeypad, OnNameFb,          CB_Name);
+  RegisterDelegate(myKeypad, OnSwVersionFb,     CB_SwVersion);
+  RegisterDelegate(myKeypad, OnTypeFb,          CB_Type);
+
+  myKeypad.SetRawJsonEnabled(Enable_Raw_Json);
+  myKeypad.Initialize(Device_UniqueID, API_Key,
+                      Number_of_Buttons, Online_Timeout_Seconds);
+  myKeypad.SetDebug(Enable_Debug);
+}

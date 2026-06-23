@@ -1,0 +1,841 @@
+================================================================================
+ DeConzZigbee – Changelog
+ Newest version on top. All previous entries are preserved.
+================================================================================
+
+--------------------------------------------------------------------------------
+Version 4.0.0  (2026-06-23)
+--------------------------------------------------------------------------------
+Major release. The whole suite moves to the v4.0 symbol generation and the
+gateway gains two connection parameters. There are no new device modules and no
+new device features over 3.6.0: this is a versioning, build-target and gateway
+configuration release, together with the build fixes required to compile the
+v4.0 sources cleanly.
+
+BREAKING – SIMPL Windows symbol rename:
+  All 14 module symbols are renamed to the v4.0 generation. #SYMBOL_NAME and the
+  .usp filenames now carry "v4.0" (e.g. "DeConz_Gateway v4.0",
+  DeConz_Gateway_Wrapper_v4.0.usp). Existing symbols in a SIMPL Windows program
+  must be replaced with the v4.0 symbols; verify signal connections after the
+  swap.
+
+Gateway – new parameters:
+  - Alive_Timeout_Seconds (INTEGER_PARAMETER, default 15, range 5-3600):
+    seconds without WS traffic before websocket_traffic_present drops to 0.
+    Previously hardcoded.
+  - Use_TLS (INTEGER_PARAMETER, 0 = plain ws://, 1 = TLS wss://): selects the
+    WebSocket scheme; pair with port 80 (WS) or 443 (WSS).
+  Both parameters shift the gateway symbol's signal layout – re-check the
+  gateway connections after upgrading.
+
+Build:
+  - Retargeted to .NET Framework 4.8 (was 4.7.2). packages.config targetFramework
+    net48; Crestron.SimplSharp.SDK.Library 2.21.252 referenced from lib\net47
+    (reference-compatible with v4.8).
+  - AssemblyVersion / AssemblyFileVersion 4.0.0.0.
+
+Build fixes (regressions introduced while generating the v4.0 sources; the suite
+did not compile without these):
+  - DeConzDevice: added the missing private _debugEnabled field (three
+    debug-gated log statements referenced it).
+  - DeConzKeypad: added the Fire(KeypadBoolDelegate, ushort) and
+    Fire(KeypadLevelDelegate, ushort) helper overloads used by ResetValueOutputs
+    (stale-value reset).
+  - DeConzLightWs / DeConzShade / DeConzThermostat: fixed the "DebugDebugLog"
+    typo back to DebugLog (URLs-built log line in each).
+  - DeConzShade: fixed undefined identifier "raw" in the open/closed threshold
+    comparison; it now uses the raw deCONZ lift value (lift.Value). open_fb /
+    closed_fb compare against the deCONZ scale (0 = open, 100 = closed),
+    independent of the SIMPL lift inversion.
+  - DeConz_Light_WS wrapper: restored the LastAnnounced_fb, SwVersion_fb and
+    Type_fb STRING_OUTPUTs (the CALLBACK functions and class delegates were
+    present, but the outputs had been dropped from the declaration, causing
+    SIMPL+ Error 1001). These device-info outputs have existed since v2.11.0.
+
+--------------------------------------------------------------------------------
+Version 3.6.0  (2026-06-18)
+--------------------------------------------------------------------------------
+New feature: stale-value reset (10 device modules).
+
+  When no update is received from a device for more than one hour, the module
+  now resets its live value and status outputs so the touch panel no longer
+  shows outdated readings. A per-module timer checks every 5 minutes; the reset
+  fires once and re-arms automatically as soon as fresh data arrives.
+
+  RESET on stale (Bool/Analog -> 0, String -> ""):
+    Alarm:      online, battery_low, Battery_state, Voltage, tampered, alarm,
+                fire, carbonmonoxide
+    Climate:    online, battery_low, Battery_state, Voltage,
+                Temperature(+str), Humidity(+str), Pressure(+str)
+    Contact:    online, open, closed, battery_low, Battery_state, Voltage
+    Keypad:     online, battery_low, Battery_state
+    Light:      online, On, Off, Brightness, Colortemp, X, Y, R, G, B,
+                Hue, Sat, Colormode, Effect
+    Motion:     online, battery_low, Battery_state, Voltage, presence,
+                tampered, Lux, Lightlevel, dark, daylight
+    Power:      online, battery_low, Battery_state, On, Off, Power, Voltage,
+                Current, Consumption_Power
+    Shade:      online, lowbattery, Battery_state, Voltage, Lift, Tilt,
+                open, closed, moving
+    Thermostat: online, lowbattery, Battery_state, Voltage, on, off, heating,
+                Valve, Temperature(+str), windowopen_detected, errorcode
+    Valve:      online, valve_on, valve_off, water_detected, battery_low,
+                Battery_state, flow_volume
+
+  PRESERVED on stale (never reset):
+    Device identity (manufacturer, modelid, name, type, swversion, device id)
+    Timestamps (lastseen, lastannounced)
+    Capabilities (Sensitivity_Max, hascolor)
+    Configuration / setpoints (thermostat setpoints, mode, offset, locked,
+      schedule, windowopen_set, displayflipped, setvalve; motion sensor_on,
+      led_indication, user_test, sensitivity, delay)
+    Cumulative meter (Power consumption kWh)
+    Raw JSON outputs and Debug$
+
+  Threshold is reception-based (time since last received update), so no device
+  clock or timezone handling is involved. GroupControl, Scene and Device are
+  not affected (no per-device lastseen).
+
+  No wrapper signal changes — drop-in at the SIMPL Windows level.
+
+--------------------------------------------------------------------------------
+Version 3.5.0  (2026-06-10)
+--------------------------------------------------------------------------------
+Performance and memory hardening (code review follow-up). No wrapper signal
+changes — drop-in replacement for v3.3.x at the SIMPL Windows level.
+
+HTTP response disposal (all 12 device modules):
+  All 31 HttpClientResponse callbacks now dispose the response in a finally
+  block. Previously the response object (holding a stream/handle) was never
+  released, leaking handles over long-term operation with periodic polling.
+
+Debug logging cost eliminated when debug is off (all modules, 43 call sites):
+  Payload-carrying DebugLog calls (full WS JSON / HTTP body) are now guarded
+  with `if (_debugEnabled)` at the call site. Previously the entire JSON
+  payload was concatenated into a new string on every event even when debug
+  output was disabled, then immediately discarded — significant avoidable GC
+  pressure on busy sensors. The [RX] log in the gateway (fired on every frame)
+  is included.
+
+Static device-info parsed once instead of every event (10 modules):
+  Manufacturer, model id, name, type, swversion (and hascolor/groups for
+  Light) were re-extracted on every WebSocket state event via full-string
+  scans, despite never changing in practice. These are now published once
+  (guarded by a _staticInfoSent flag) and re-published a single time after a
+  reconnect (reset in ScheduleGetState / ScheduleGetAll, or on online-timeout
+  for sensor-only modules). lastseen / lastannounced timestamps continue to
+  fire on every event since they genuinely change. This removes 5-6 full JSON
+  scans per event on every device.
+
+No functional signal behaviour changes.
+
+--------------------------------------------------------------------------------
+Version 3.3.1  (2026-05-30)
+--------------------------------------------------------------------------------
+Fixed _SKIP_ placement in all 14 SIMPL+ wrappers per corrected rule:
+  Leading _SKIP_ entries are required only in the FIRST input block
+  (DIGITAL_INPUT) and FIRST output block (DIGITAL_OUTPUT) to push signal
+  names below the parameter fields in SIMPL Windows. All inputs share one
+  left column; all outputs share one right column. ANALOG_INPUT, STRING_INPUT,
+  ANALOG_OUTPUT and STRING_OUTPUT continue in the same column below the already-
+  cleared region and require no leading skips — these were spurious dead rows.
+
+  Removed leading _SKIP_ from AI, AO, SI, SO blocks in all 14 modules.
+
+Additional cleanup:
+  Gateway   DI: double _SKIP_ after Disable_Websocket reduced to single.
+  Keypad    DO: trailing _SKIP_ at end of block removed.
+  Light_WS  DI: SET_RGB moved into On/Off group (Set_On, Set_Off, SET_RGB)
+               rather than standing alone between two skips.
+  Light_WS  SO: redundant and double _SKIP_ entries removed; simplified to
+               one separator between color/device info and raw JSON outputs.
+
+No C# changes. No functional changes.
+
+--------------------------------------------------------------------------------
+Version 3.3.0  (2026-05-30)
+--------------------------------------------------------------------------------
+DeConzMotion: Extended ZHAPresence configuration and feedback.
+
+  New commands (PUT /sensors/<id>/config):
+    Sensor_On / Sensor_Off      → config.on (enable/disable sensor)
+    Led_On / Led_Off            → config.ledindication (LED on sensor)
+    User_Test_On / User_Test_Off → config.usertest (increased sensitivity mode)
+    Sensitivity_In (AI)         → config.sensitivity (0..Sensitivity_Max_fb)
+    Delay_In (AI)               → config.delay in ms (Philips-specific)
+
+  New feedback outputs:
+    sensor_on_fb (DO)           ← config.on
+    led_indication_fb (DO)      ← config.ledindication
+    user_test_fb (DO)           ← config.usertest
+    Sensitivity_fb (AO)         ← config.sensitivity
+    Sensitivity_Max_fb (AO)     ← config.sensitivitymax (device max, readonly)
+    Delay_fb (AO)               ← config.delay in ms
+
+  Sensitivity_Max_fb: read the device maximum first, then use it as the upper
+  limit for Sensitivity_In. Sensitivity and Delay are Philips-specific fields
+  (Hue Motion, etc.); they are silently ignored by other brands.
+
+  Total: 24 delegates.
+
+--------------------------------------------------------------------------------
+Version 3.2.1  (2026-05-27)
+--------------------------------------------------------------------------------
+Fixed _SKIP_ counts in 6 SIMPL+ wrappers.
+  In SIMPL Windows, the number of _SKIP_ placeholders before the first signal
+  in each I/O block must equal the number of module parameters so that signal
+  labels appear below the parameter fields. When the count was wrong, signal
+  names overlapped with parameter text or appeared too early in the symbol.
+
+  Light_WS    (3 params): DI 4→3, AI 1→3, AO 5→3, SO 0→3
+  Thermostat  (4 params): AI 1→4, DO 3→4, AO 0→4, SO 0→4
+  Valve       (5 params): DI 4→5, DO 4→5, AO 1→5, SO 1→5
+  Keypad      (4 params): AO 1→4, SO 1→4
+  Gateway     (4 params): AO 0→4, SO 0→4
+  Device      (6 params): SO 1→6
+
+  No C# changes. No functional changes.
+
+--------------------------------------------------------------------------------
+Version 3.2.0  (2026-05-27)
+--------------------------------------------------------------------------------
+DeConzThermostat: Extended with additional fields and commands.
+  New commands (all PUT /sensors/<id>/config):
+    Valve_Open / Valve_Close    → config.setvalve (valve override, device-specific)
+    Schedule_On / Schedule_Off  → config.schedule_on (enable/disable built-in schedule)
+    Display_Flip_On / _Off      → config.displayflipped (rotate display 180°)
+    External_Temperature (AI)   → config.externaltemperature in 1/100 °C
+  New feedback outputs:
+    windowopen_detected_fb (DO) ← state.windowopen (sensor has detected open window)
+    schedule_on_fb (DO)         ← config.schedule_on
+    setvalve_fb (DO)            ← config.setvalve
+    displayflipped_fb (DO)      ← config.displayflipped
+    errorcode_fb (SO)           ← state.errorcode (device-specific error codes)
+  Clarification: windowopen_set_fb = window-open detection enabled/disabled (config).
+                 windowopen_detected_fb = window currently detected as open (state).
+  34 delegates total.
+
+DeConzShade: Configurable open/closed thresholds.
+  New parameters Open_Threshold (default 1) and Closed_Threshold (default 99).
+  open_fb = 1 when lift <= Open_Threshold.
+  closed_fb = 1 when lift >= Closed_Threshold.
+  Defaults match previous hardcoded behaviour – no breaking change.
+  Wrapper now has 7 parameters → 7 _SKIP_ before first signal.
+
+Raw JSON output chunking (all modules):
+  All raw JSON outputs now deliver payloads in 250-character chunks via a new
+  FireChunked() helper in each class. Previously some modules truncated to
+  250 chars and others to 65000. FireStr() remains for short non-raw strings
+  (names, formatted values) with a 250-char safety limit.
+  Affected outputs: all OnXxxRawJson, OnRawJsonFb, OnAllGroupsFb, OnSceneAttrFb.
+
+Console output gating (all modules, completed):
+  Remaining operational messages converted to DebugLog() across all modules.
+  Only genuine errors remain visible without Enable_Debug active.
+
+--------------------------------------------------------------------------------
+Version 3.1.2  (2026-05-26)
+--------------------------------------------------------------------------------
+Fixed: raw JSON outputs active at startup regardless of Enable_Raw_Json signal.
+  - SetRawJsonEnabled() was called after Initialize() in 7 wrappers (Climate,
+    Contact, Keypad, Light_WS, Shade, Thermostat, Valve). Correct order is
+    SetRawJsonEnabled() before Initialize() so the flag is set before any
+    broker callback can fire. Already correct: Alarm, Device, Group_Control,
+    Motion, Power, Scene.
+
+Fixed: DeConzLightWs FireRawJson() missing _rawJsonEnabled gate (v3.1.1).
+  - FireRawJson() lacked the guard, causing raw_json_out to fire on every
+    WS event regardless of the Enable_Raw_Json input state.
+
+Fixed: Console flooded with operational messages when debug is off.
+  - All modules emitted informational messages (Initialized, GetState in X s,
+    Resolved id=, Battery resolved, etc.) unconditionally via Log() /
+    CrestronConsole.PrintLine(), regardless of the Enable_Debug signal.
+  - Converted all operational/verbose messages to DebugLog() across all 13
+    device modules. Only genuine errors (HTTP failures, parse errors,
+    configuration errors) remain visible without debug enabled.
+  - Online timeout messages were already partially fixed in v3.1.1; this
+    completes the work for all message categories.
+  - Broker and WebSocketClient log output is unchanged (separate debug gate).
+
+--------------------------------------------------------------------------------
+Version 3.1.1  (2026-05-26)
+--------------------------------------------------------------------------------
+DeConzLightWs: Fixed raw JSON output ignoring Enable_Raw_Json signal.
+  - FireRawJson() was missing the _rawJsonEnabled gate, causing raw_json_out
+    to fire on every WS event regardless of the Enable_Raw_Json input state.
+  - All other modules (Keypad, Shade, Thermostat, Climate, etc.) already had
+    the gate in place. This was the only module affected.
+
+--------------------------------------------------------------------------------
+Version 3.1.0  (2026-05-25)
+--------------------------------------------------------------------------------
+New modules: DeConzMotion, DeConzPower, DeConzAlarm. Suite now 14 modules.
+
+DeConzMotion – Presence + light level sensor:
+  - ZHAPresence endpoint: presence_fb, tampered_fb.
+  - ZHALightLevel endpoint: lux_fb, lightlevel_fb, dark_fb, daylight_fb.
+  - Configurable via HTTP PUT config: duration (presence timeout),
+    tholddark and tholdoffset (light level thresholds for dark/daylight flags).
+  - State fetched on WS connect/reconnect (random 1-15 s). No background poll.
+  - Optional ZHABattery endpoint. All three UIDs are optional.
+  - 5 parameters → 5 SKIP. 18 delegates.
+
+DeConzPower – Smart plug / power meter:
+  - Three optional endpoints: switch (on/off light), ZHAPower, ZHAConsumption.
+  - Switch: Set_On / Set_Off commands + on_fb / off_fb feedback.
+  - ZHAPower: Power_fb (W), Voltage_fb (V), Current_fb (A).
+  - ZHAConsumption: Consumption_fb (Wh), Consumption_Power_fb (W).
+  - Note: consumption is a hardware counter; reset not possible via deCONZ API.
+    Implement a software offset in SIMPL+ for reset functionality.
+  - 5 parameters → 5 SKIP. 18 delegates.
+
+DeConzAlarm – Alarm / fire / CO safety sensors:
+  - Three optional endpoints: ZHAAlarm, ZHAFire, ZHACarbonMonoxide.
+  - Shared: tampered_fb, battery_low, battery_level, online timer.
+  - Suitable for single-type detectors and combination devices (all three UIDs).
+  - Optional ZHABattery endpoint.
+  - 6 parameters → 6 SKIP. 17 delegates.
+
+Group and Scene modules: added full CRUD and management functions.
+  - DeConzGroupControl: CreateGroup, SetName, SetMembers, GetAllGroups,
+    plus DeleteGroup (v3.0). New outputs: Create_success_fb, New_Group_Id_fb,
+    Set_Attr_success_fb, all_groups_fb, Members_In and New_Group_Name inputs.
+  - DeConzScene: CreateScene, DeleteScene, SetSceneName, GetSceneAttr.
+    New outputs: Create_Success_fb, Delete_Success_fb, Set_Attr_Success_fb,
+    New_Scene_Id_fb, scene_attr_fb. New input: New_Scene_Name.
+
+--------------------------------------------------------------------------------
+Version 3.0.0  (2026-05-26)   *** FIRST PUBLIC RELEASE ***
+--------------------------------------------------------------------------------
+First publicly released version of the DeConz Zigbee SIMPL# module suite.
+
+This release consolidates the complete module set and all fixes accumulated
+during private development into a stable, documented public package.
+
+Included modules (11):
+  Gateway, Device, Keypad, Light_WS, Valve, Shade, Thermostat,
+  Climate, Contact, Group_Control, Scene.
+Supporting infrastructure:
+  DeConzBroker (static multicast bus), DeConzJsonParser (shared parser),
+  DeConzWebSocketClient (RFC-6455 gateway connection).
+
+Changes in this release:
+  - Signed temperature output fix (Climate, Thermostat):
+    The Temperature_fb analog output now carries negative temperatures as a
+    16-bit two's-complement value, to be read as a signed analog in SIMPL
+    (e.g. -5.0 C → 65036). Previously negative temperatures were clamped to 0.
+    The Temperature_str string output was and remains correct for all values.
+    Humidity and pressure are unsigned and unchanged.
+  - Documentation rewritten in English, restructured, and brought up to date
+    for all 11 modules.
+
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+Version 2.19.0  (2026-05-24)
+--------------------------------------------------------------------------------
+Memory management: fixed fire-and-forget CTimer leak (critical code review).
+  - 12 one-shot CTimer instances across 8 modules were created without being
+    stored or disposed (ScheduleGetState/ScheduleGet stagger timers and
+    Scene success pulses).
+  - Crestron CTimer is IDisposable and holds an internal .NET timer +
+    callback delegate; one-shot timers do not free themselves after firing.
+  - Fix: each one-shot timer is now held in a local variable and disposes
+    itself at the end of its callback:
+      CTimer t = null;
+      t = new CTimer(_ => { Work(); if (t != null) t.Dispose(); }, null, delay);
+  - Affected: Climate, Contact (×2), Keypad, LightWs, Scene (×2),
+    Shade (×2), Thermostat (×2), Valve.
+  - Stored timers (_onlineTimer, _pollTimer, _brightnessTimer, _moveTimer,
+    _aliveTimer, _reconnectTimer) were already correctly stopped/nulled and
+    are unchanged.
+
+Code review notes (no change required):
+  - Dispose() methods exist and are symmetric (Register/Unregister balanced)
+    but are not called by SIMPL+ wrappers. Acceptable: SIMPL# objects live
+    for the whole program lifetime; AppDomain unload frees everything on
+    program restart. Methods retained for completeness.
+  - HttpClient is a long-lived readonly instance per module – this is the
+    recommended usage pattern, not a leak.
+  - WebSocketClient socket cleanup correctly removes event handlers (-=) and
+    nulls references in CloseSocket().
+
+--------------------------------------------------------------------------------
+
+--------------------------------------------------------------------------------
+Version 2.18.1  (2026-05-24)
+--------------------------------------------------------------------------------
+Fixed CS1503 compile errors in DeConzScene, DeConzGroupControl, DeConzClimate.
+  - DispatchAsync() requires Crestron's HTTPClientResponseCallback delegate,
+    not a generic Action<HttpClientResponse, HTTP_CALLBACK_ERROR>.
+  - Lambda callbacks passed to DispatchAsync (e.g. "(resp,err) => OnFoo(s,…)")
+    are incompatible with this type and cause CS1503.
+  - Fix: replaced lambdas with named callbacks matching the Crestron signature.
+    Slot / context captured in instance fields (_pendingHttpSlot,
+    _pendingRecallGroup/_Scene, _lastActionSlot) set before DispatchAsync.
+  - All CS files scanned – no remaining lambda-at-DispatchAsync patterns.
+
+--------------------------------------------------------------------------------
+Version 2.18.0  (2026-05-24)
+--------------------------------------------------------------------------------
+New modules: DeConzGroupControl, DeConzScene.
+
+DeConzGroupControl – deCONZ light group control:
+  - Controls 1-4 groups simultaneously via HTTP PUT /groups/<id>/action.
+  - Group IDs supplied at runtime via ANALOG_INPUT (Group_ID … Group_ID_4).
+    No fixed parameter – groups can be changed from SIMPL+ logic at any time.
+    Group_ID_2/3/4 = 0 disables that slot.
+  - Commands: Set_On, Set_Off, Toggle, SetBrightness, SetColortemp (Kelvin),
+    SetHue, SetSat, Alert (select/long/none), Effect (colorloop/none).
+  - Transitiontime analog input (1/10 s) applied to brightness/color commands.
+  - State feedback from primary group (GET /groups/<id>):
+    all_on_fb, any_on_fb, Brightness_fb, Colortemp_fb, Colormode_fb,
+    group_name_fb, members_fb ("3,42,43"), scenes_fb ("1:warmlight,2:reading").
+  - Pure HTTP module – no WebSocket / broker registration.
+  - 10 delegates.
+
+DeConzScene – deCONZ scene recall and store:
+  - Group_ID and Scene_ID set at runtime via ANALOG_INPUT.
+  - Recall_Scene: PUT /groups/<G>/scenes/<S>/recall
+  - Store_Scene:  PUT /groups/<G>/scenes/<S>/store (captures current state)
+  - Get_Scenes:   GET /groups/<G>/scenes → scenes_list_fb ("1:warmlight,2:reading")
+  - Recall_Success_fb / Store_Success_fb: 200 ms pulse on HTTP 200 OK.
+  - Last_Recalled_Group_fb / Last_Recalled_Scene_fb: analog feedback.
+  - Pure HTTP module – no WebSocket / broker registration.
+  - 7 delegates.
+
+Both modules:
+  - Only API_Key as parameter → 1 _SKIP_ before first signal.
+  - Enable_Raw_Json digital input (consistent with all other modules).
+  - GatewayIP read from DeConzBroker (no IP parameter needed).
+
+--------------------------------------------------------------------------------
+Version 2.17.0  (2026-05-24)
+--------------------------------------------------------------------------------
+New modules: DeConzClimate, DeConzContact.
+
+DeConzClimate – Zigbee environment sensor suite:
+  - Supports ZHATemperature, ZHAHumidity, ZHAPressure as separate endpoints.
+    Each has its own UniqueID parameter; all except Temperature are optional.
+  - Option-C dual output: Analog raw (1/100 unit or hPa) + formatted string.
+  - Shared online timer and battery (last-wins across all active endpoints).
+  - Optional Battery_UniqueID for dedicated ZHABattery endpoint.
+  - State fetched on connect/reconnect (random 1-15 s stagger per slot).
+  - 20 delegates.
+
+DeConzContact – Zigbee door/window contact sensor (ZHAOpenClose):
+  - open_fb (DO) and closed_fb (DO) – complementary outputs.
+  - 30-minute background poll + GetState on connect/reconnect.
+  - Optional Battery_UniqueID for dedicated ZHABattery endpoint.
+  - Device info outputs consistent with other typed modules.
+  - 16 delegates.
+
+Enable_Raw_Json digital input added to all device modules (8 modules):
+  - Raw JSON output is now disabled by default (default = 0).
+  - Pulse/hold Enable_Raw_Json high to activate raw_json_out and all other
+    raw JSON outputs (battery_raw_json, valve_raw_json etc.) in a module.
+  - Modules with multiple raw JSON outputs (Valve: 2, Thermostat: 2,
+    Shade: 2, Climate: 4, Contact: 2, Device: 7) use a single shared enable.
+  - Implemented as _rawJsonEnabled flag checked in FireRawJson/FireRaw before
+    any raw JSON delegate is invoked.
+
+Wrapper signal layout rule applied:
+  - Number of _SKIP_ before first I/O signal = number of parameters,
+    so signals appear below the parameter fields in SIMPL Windows.
+
+DeConzLightWs: Brightness feedback fixed (was not updating on SetBrightness).
+  - _lastOn cache could be stale when a bri-only WS event arrived.
+  - Now uses on-state from the current event when available, falls back to
+    cached _lastOn only when on field is absent.
+  - Timer re-created on each bri event (Reset() kept old lambda with stale
+    captured bv value).
+
+--------------------------------------------------------------------------------
+Version 2.16.9  (2026-05-24)
+--------------------------------------------------------------------------------
+DeConzShade: Fixed CS0103 compile errors (missing battery endpoint fields).
+  - Private fields _batteryUid, _batteryId, _batteryResource, _batteryBaseUrl,
+    _batteryLock, _hasBatteryEndpoint were missing from the class body.
+  - The field-insertion patch in v2.16.8 failed silently; the fields were
+    referenced by methods but never declared, causing 35 CS0103 errors.
+
+--------------------------------------------------------------------------------
+Version 2.16.8  (2026-05-23)
+--------------------------------------------------------------------------------
+DeConzShade: Added optional ZHABattery second endpoint.
+  - Same dual-endpoint pattern as Thermostat and Valve modules.
+  - New parameter Battery_UniqueID (leave empty if not applicable).
+  - New analog output Voltage_fb (battery voltage in mV).
+  - New string output battery_raw_json.
+  - Battery level and low-battery parsed from dedicated sensor endpoint if
+    configured; falls back to shade endpoint values otherwise.
+  - 19 delegates, all verified.
+
+--------------------------------------------------------------------------------
+Version 2.16.7  (2026-05-23)
+--------------------------------------------------------------------------------
+DeConzKeypad: Fixed stale button event re-firing on GetState.
+  - buttonevent is persistent in deCONZ (always contains last press).
+    Calling HTTP GET caused the last pressed button to fire again every time
+    state was refreshed (on connect, 30-min poll, or manual Get_State pulse).
+  - ParseAndDispatch split into:
+      ParseStatus()      – battery/lowbattery – safe for HTTP GET and WS
+      ParseButtonEvent() – button events – WS only, never from HTTP response
+  - HTTP response path now calls ParseStatus only; button events are
+    exclusively dispatched from incoming WS frames.
+
+--------------------------------------------------------------------------------
+Version 2.16.6  (2026-05-23)
+--------------------------------------------------------------------------------
+DeConzBroker: Removed single-handler-per-UID limitation (multicast).
+  - _handlers changed from Dictionary<uid, Action> to
+    Dictionary<uid, List<Action>>.
+  - Multiple modules can now share the same uniqueid (e.g. a generic Device
+    module alongside a typed Light module on the same lamp) without one
+    silently overwriting the other's registration.
+  - RegisterDevice: appends to list; idempotent (same delegate not added twice).
+  - DispatchUpdate: invokes all registered callbacks via snapshot outside lock
+    to avoid deadlocks.
+  - New UnregisterDevice(uid, callback) overload removes only the caller's own
+    handler. Old UnregisterDevice(uid) overload kept for backwards compatibility.
+  - All 7 device modules updated to use the callback-specific unregister to
+    avoid unintentionally removing other modules' handlers.
+
+DeConzDevice: Hardening.
+  - _initialized guard in Initialize() prevents double-init.
+  - AddUniqueId() logs a warning and returns if called after Initialize().
+  - Lambda handlers for additional UIDs stored in _extraHandlers[] so
+    Dispose() can unregister precisely its own callbacks (multicast-safe).
+
+--------------------------------------------------------------------------------
+Version 2.16.5  (2026-05-23)
+--------------------------------------------------------------------------------
+DeConzDevice: Extended to support up to 6 UniqueIDs (1 primary + 5 optional).
+  - AddUniqueId(slot, uid) registers additional endpoints before Initialize().
+  - Each UID slot has its own raw_json_out_N output (2-6).
+  - New raw_json_all output receives every payload from all active UIDs.
+  - Empty/null additional UIDs are silently ignored (optional by design).
+  - Wrapper: 6 STRING_PARAMETER entries for UIDs, 7 STRING_OUTPUTs.
+
+--------------------------------------------------------------------------------
+Version 2.16.4  (2026-05-23)
+--------------------------------------------------------------------------------
+Based on v2.16.3 (see 2.16.3 entry below).
+Applied two additional fixes:
+
+DeConzThermostat: ExtractBlock made string-literal aware.
+  - Old implementation counted braces naively; a device name containing
+    { or } (e.g. "Room {1}") would corrupt the block extraction depth
+    counter, causing config/state fields to be silently skipped.
+  - New implementation mirrors FindValueStart: tracks inString state and
+    correctly handles escaped quotes (backslash-parity detection).
+  - Verified with edge-case test: brace inside a JSON string value no
+    longer affects block boundary detection.
+
+Version consistency: All SYMBOL_NAMEs (were "v2.16.3.3"), AssemblyInfo,
+README and file names unified to v2.16.4.
+
+--------------------------------------------------------------------------------
+Version 2.16.3  (2026-05-23)
+--------------------------------------------------------------------------------
+CRITICAL: Fixed regression introduced in v2.16.2 where the parser-block
+removal script deleted business logic methods alongside the private parser
+methods. DeConzValve, DeConzShade and DeConzThermostat were non-compilable.
+
+Restored methods in affected classes:
+  DeConzValve       – ParseValveState, ParseSensorState, ParseDeviceInfo,
+                      RestartOnlineTimer, StopOnlineTimer
+  DeConzShade       – ParseState, ParseDeviceInfo, ScheduleGetState,
+                      RestartOnlineTimer, StopOnlineTimer
+  DeConzThermostat  – ParseState, ParseConfig, ParseDeviceInfo,
+                      ParseBatteryState, RestartOnlineTimer, StopOnlineTimer
+
+Additional improvements included in this release:
+  - DeConzThermostat: ExtractBlock() to isolate state{} vs config{} objects,
+    preventing state.on from being read when config.on is intended (both at
+    depth 2, same key name).
+  - DeConzJsonParser: NextStaggerMs() added (shared static Random with lock),
+    replaces all per-call new Random() instances that could produce identical
+    delays when called simultaneously on reconnect.
+  - DeConzWebSocketClient: permessage-deflate extension removed from WS
+    handshake offer. The frame decoder cannot handle compressed payloads;
+    advertising the extension risked the server sending compressed frames.
+  - TOCTOU guards added to BuildUrls() in all modules (prevents double URL
+    construction on concurrent threads).
+  - Range guards for thermostat setpoints (500–3500 = 5.0–35.0°C) reject
+    SIMPL+ startup zero-signals.
+  - InvariantCulture used for temperature/offset string formatting instead
+    of manual comma-to-dot replacement.
+
+--------------------------------------------------------------------------------
+Version 2.16.2  (2026-05-22)  [BROKEN – superseded by 2.16.3]
+--------------------------------------------------------------------------------
+DeConzJsonParser: Created shared static utility class.
+  - All five device modules (LightWs, Keypad, Shade, Valve, Thermostat)
+    previously each had their own copy of the JSON parser (~100 lines × 5).
+  - Moved to DeConzJsonParser.cs: ExtractBool, ExtractInt, ExtractString,
+    ExtractTopLevelString, ExtractXY, ExtractGroupsList, FindValueStart.
+  - All callers updated to use DeConzJsonParser.* qualified calls.
+  REGRESSION: The refactor script removed too aggressively and deleted
+  business logic methods (ParseState, ParseDeviceInfo, etc.) in Valve,
+  Shade and Thermostat. These classes did not compile. Fixed in 2.16.3.
+
+--------------------------------------------------------------------------------
+Version 2.16.1  (2026-05-22)
+--------------------------------------------------------------------------------
+DeConzThermostat: Added optional ZHABattery second endpoint.
+  - New parameter Battery_UniqueID (optional, leave empty if not present).
+  - Second broker registration for battery sensor UID.
+  - Parses state.voltage (mV), config.battery (%), state.lowbattery.
+  - New outputs: Voltage_fb (AO), battery_raw_json (SO).
+  - GetBatteryState() triggered on WS connect/reconnect with random delay.
+
+--------------------------------------------------------------------------------
+Version 2.16.0  (2026-05-22)
+--------------------------------------------------------------------------------
+New module: DeConzThermostat (ZHAThermostat).
+  - Commands via HTTP PUT to /sensors/<id>/config (not /state – key
+    architectural difference from all other modules).
+  - Separate URL for config (_configUrl) vs state read (_baseUrl).
+  - config.on vs state.on disambiguated: on_fb/off_fb = thermostat
+    enabled/disabled; heating_fb = currently heating (state.on or valve>0).
+  - Temperature outputs: OnTemperatureFb (raw 1/100°C) + OnTemperatureStrFb
+    ("21.5") – Option C dual output.
+  - Offset parameter uses +1000 bias for unsigned SIMPL+ ushort transfer.
+  - Commands: SetOn/Off, Lock/Unlock, SetWindowOpenDetection,
+    SetHeatSetpoint, SetCoolSetpoint, SetMode (0-3), SetOffset.
+  - Outputs: temperature, heatsetpoint, coolsetpoint (analog + string each),
+    valve, mode, locked, windowopen_set, battery, lowbattery, online.
+  - 27 delegates.
+
+--------------------------------------------------------------------------------
+Version 2.15.0  (2026-05-22)
+--------------------------------------------------------------------------------
+New module: DeConzShade (window covering / blind / drape).
+  - Commands: MoveUp {"open":true}, MoveDown {"open":false}, Stop,
+    SetLift (0-100), SetTilt (0-100 for venetian blinds).
+  - deCONZ lift convention: 0=open, 100=closed. Invert_Lift parameter
+    mirrors the scale for SIMPL+ (0=closed, 100=open).
+  - Derived outputs: open_fb (lift≤1), closed_fb (lift≥99).
+  - moving_fb heuristic: set on command, cleared when reported lift reaches
+    commanded target (±1) or after 3 s timeout.
+  - Tilt support for venetian blinds (SetTilt, Tilt_percentage_fb).
+  - Device info outputs (lastseen, manufacturer, modelid etc.) consistent
+    with Light WS module.
+  - 17 delegates.
+
+--------------------------------------------------------------------------------
+Version 2.14.0  (2026-05-21)
+--------------------------------------------------------------------------------
+New module: DeConzValve (irrigation valve).
+  - Two deCONZ endpoints in one SIMPL+ module:
+      Valve endpoint  (On/Off output, resource "lights") – on/off commands
+      Sensor endpoint (ZHAWater, resource "sensors") – water, flow, battery
+  - Both UIDs register independently with DeConzBroker.
+  - Device IDs and resource types resolved automatically from first WS frame.
+  - Configurable Flow_Key parameter (default "flow") for the flow volume
+    JSON key, which varies by device model.
+  - Outputs: valve_on_fb, valve_off_fb, water_detected, battery_low,
+    battery_level, flow_volume_fb, valve_id_fb, sensor_id_fb,
+    device info strings, valve_raw_json, sensor_raw_json.
+  - GetState() fetches both endpoints on connect/reconnect.
+
+Versioning scheme introduced:
+  - Small changes, no wrapper change → same version number
+  - Relevant bugfix → bump 3rd digit (e.g. 2.14.0 → 2.14.1)
+  - New module or major feature → bump 2nd digit (e.g. 2.14 → 2.15)
+
+--------------------------------------------------------------------------------
+Version 2.13.0  (2026-05-21)
+--------------------------------------------------------------------------------
+Wrapper baseline established. Changes:
+  - Signal positions rearranged with _SKIP_ placeholders for preferred
+    symbol layout in SIMPL Windows.
+  - Long star comment lines removed/shortened to prevent SIMPL+ compile
+    errors caused by star-run sequences in comment blocks.
+  - All _skip_ → _SKIP_ unified (SIMPL+ is case-insensitive but unified
+    for consistency).
+
+Note: baseline for all subsequent wrapper changes.
+
+--------------------------------------------------------------------------------
+Version 2.12.0  (2026-05-21)
+--------------------------------------------------------------------------------
+DeConzLightWs: Depth-aware JSON parser.
+  - FindValueStart() now tracks nesting depth and accepts a targetDepth
+    parameter (0=any, 1=top-level, 2=nested state/config).
+  - Prevents false matches: e.g. "name" inside state cannot be confused
+    with the top-level device "name".
+  - ParseDeviceInfo uses depth 1 (top-level fields).
+  - ParseAndFire uses depth 2 (state object fields).
+  - Parser verifies candidate is a KEY (followed by ':'), not a string
+    value that happens to equal the key name.
+  - ExtractTopLevelString refactored as wrapper for ExtractString(..., 1).
+  - All 26 Light WS delegates verified to match between wrapper and class.
+
+DeConz_Keypad_Wrapper: Removed phantom Slot_Index INTEGER_PARAMETER that
+  had reappeared and shifted parameter positions in the SIMPL symbol.
+
+Cosmetic: Comment "// default 5 min" corrected to "// default 2 min"
+  in DeConzLightWs (value was already 120000 ms = 2 min).
+
+--------------------------------------------------------------------------------
+Version 2.11.0  (2026-05-21)
+--------------------------------------------------------------------------------
+DeConzLight (HTTP-only module): Removed. All light control now via
+  DeConzLightWs (HTTP commands + WS feedback hybrid).
+  - LightBoolDelegate, LightLevelDelegate, LightStringDelegate (formerly
+    defined in DeConzLight.cs) moved into DeConzLightWs.cs to prevent
+    CS0246 compile errors after file removal.
+
+DeConzLightWs: Added device-info outputs populated from HTTP GET responses
+  and WS "attr" events:
+  - hascolor_fb (DO), Groups_fb, LastAnnounced_fb, LastSeen_fb,
+    Manufacturer_fb, ModelId_fb, Name_fb, SwVersion_fb, Type_fb.
+  - ParseDeviceInfo() called in both HTTP and WS paths so attr events
+    (pushed periodically by deCONZ) update lastseen etc. in real time.
+  - ExtractGroupsList(): parses config.groups string array → "0,9,17,23".
+
+DeConzKeypad: Added HTTP GetState + 30-minute background polling.
+  - Initialize now requires API_Key parameter.
+  - GetState() via HTTP GET on WS connect/reconnect (random 1-15 s) and
+    every 30 minutes (CTimer).
+  - Added device info outputs: LastAnnounced_fb, LastSeen_fb,
+    Manufacturer_fb, ModelId_fb, Name_fb, SwVersion_fb, Type_fb.
+  - Enable_Debug: was duplicate INTEGER_PARAMETER causing compile error;
+    kept as DIGITAL_INPUT only.
+
+All wrappers: Online_Timeout_Seconds default changed 300/360 → 120.
+All wrappers: First comment line "//*****" → "/*****" (removed extra /).
+All wrappers: "disnamic.com" removed from all headers.
+csproj: DeConzLight.cs removed from Compile entries.
+
+--------------------------------------------------------------------------------
+Version 2.10.0  (2026-05-21)
+--------------------------------------------------------------------------------
+DeConzBroker: WS-connected notification added (multicast to device modules).
+  - RegisterConnectedCallback(uid, Action) / UnregisterConnectedCallback(uid)
+  - NotifyWsConnected(): called by WebSocketClient after every successful
+    handshake; fires all registered callbacks on a CrestronInvoke thread.
+
+DeConzLightWs: ScheduleGetState() on WS connect/reconnect.
+  - Registered via DeConzBroker.RegisterConnectedCallback.
+  - Random 1-15 s delay via DeConzJsonParser.NextStaggerMs() prevents all
+    modules hitting deCONZ simultaneously after a reconnect.
+  - Also called from BuildUrls() for the initial state fetch after the
+    first WS frame resolves the device ID.
+
+DeConzWebSocketClient: NotifyWsConnected() called after successful handshake
+  alongside setting DeConzBroker.SendWsFrame.
+
+--------------------------------------------------------------------------------
+Version 2.9.0  (2026-05-20)
+--------------------------------------------------------------------------------
+DeConzLightWs: Hybrid light module (HTTP commands + WS feedback) introduced,
+  replacing the previous HTTP-only DeConzLight approach.
+  - Device ID and resource type resolved automatically from first WS event
+    ("id" and "r" fields); no Device_ID / Type_Of_Device parameters needed.
+  - Commands via HTTP PUT to /lights/<id>/state.
+  - Full color support: on/off, brightness, colortemp (Kelvin↔Mired),
+    hue/sat, XY (CIE), RGB (with Philips Wide-Gamut D65 matrix conversion).
+  - effect and colormode feedback.
+  - Online timer with configurable timeout.
+  - Debug output.
+
+DeConzBroker: GatewayIP static property set by Gateway at Initialize();
+  all device modules read it directly for HTTP URL construction.
+  No IP signal wiring between modules required.
+
+--------------------------------------------------------------------------------
+Version 2.4.0  (2026-05-20)
+--------------------------------------------------------------------------------
+Version number added to all SIMPL+ wrapper filenames and #SYMBOL_NAME.
+  e.g. DeConz_Light_Wrapper.usp → DeConz_Light_Wrapper_v2.4.usp,
+       #SYMBOL_NAME "DeConz_Light v2.4"
+AssemblyInfo version set to 2.4.0.0.
+README updated to reflect new filename convention.
+
+--------------------------------------------------------------------------------
+Version 2.3.0  (2026-05-20)
+--------------------------------------------------------------------------------
+DeConzKeypad: New module for Zigbee keypads and remote controls (1-10 buttons).
+  - Registers with DeConzBroker for WS feedback.
+  - buttonevent decoded: buttonNum = event/1000, code = event%1000.
+  - Event codes: 0=press/hold, 1=hold, 2=short_release, 3=long_release,
+    4=double_press → separate per-button DO outputs.
+  - Online timer (configurable, default 360 s).
+  - Battery level (AO 0-100) and battery_low (DO).
+  - Parameters: Device_UniqueID, Slot_Index, Number_of_Buttons (1-10),
+    Online_Timeout_Seconds, Enable_Debug.
+  - Fixes: Button array was 2D [N,N] in original SIMPL+ → corrected to 1D.
+    Double-press event (code 4) added (not present in original).
+
+csproj: TargetFrameworkVersion corrected v4.6.2 → v4.7.2.
+csproj: SDK reference changed from local HintPath to PackageReference
+  Crestron.SimplSharp.SDK.Library v2.21.252 (NuGet).
+
+README: Architecture diagram and module reference tables added.
+
+--------------------------------------------------------------------------------
+Version 2.2.0  (2026-05-20)
+--------------------------------------------------------------------------------
+DeConzLight: Added HueSat command (SetHueSat) – PUT {hue, sat}.
+DeConzLight: Added XY color command (SetXY) – PUT {xy:[x,y]}.
+  - SIMPL+ wrapper: X_Coordinate / Y_Coordinate STRING_INPUTs, fire PUT
+    when both have a non-empty value.
+
+--------------------------------------------------------------------------------
+Version 2.1.0  (2026-05-20)
+--------------------------------------------------------------------------------
+DeConzLight: New SIMPL# class for Zigbee light control.
+  - HTTP PUT commands: SetOn, SetOff, SetBrightness (0-254),
+    SetColortemp (Kelvin → Mired).
+  - HTTP GET: GetState() → feedback parsed and fired via delegates.
+  - WS feedback via DeConzBroker (on/off, brightness, colortemp).
+  - IP from DeConzBroker.GatewayIP (no signal wiring).
+  - Native Crestron HttpClient (removes HTTP_Command_Library.clz dependency).
+
+DeConzWebSocketClient: Static WS accept-key replaced with RFC-6455 compliant
+  random Base64 key (crypto-quality random, correct SHA1 + Base64 encoding).
+  Previously the accept-key was hardcoded, causing handshake failures with
+  strict servers.
+
+--------------------------------------------------------------------------------
+Version 2.0.0  (2026-05-20)  [initial SIMPL# rewrite]
+--------------------------------------------------------------------------------
+Full rewrite of original SIMPL+ deCONZ gateway as SIMPL# module suite.
+
+DeConzBroker (static class):
+  - Central message bus; routes WS payloads to registered device modules.
+  - No signal wiring between Gateway and device modules required.
+  - GatewayIP property for HTTP URL construction by device modules.
+  - Thread-safe dispatch via CrestronInvoke.BeginInvoke.
+
+DeConzWebSocketClient:
+  - Native RFC-6455 WebSocket (TCP via CrestronTCP / SecureTCPClient for TLS).
+  - Full frame decoder: fin/opcode/mask/payload length (including 16- and
+    64-bit extended lengths).
+  - Exponential back-off reconnect (5 s → 30 s max).
+  - Ping/Pong keepalive.
+  - TLS/WSS support via Use_TLS parameter.
+  - Traffic-present indicator with configurable alive timeout.
+
+DeConzDevice:
+  - Raw JSON passthrough; forwards WS payloads to SIMPL+ raw_json_out.
+  - Registers with broker by uniqueid (no slot index required initially).
+
+Improvements over original SIMPL+ module:
+  - Reconnect logic: none → exponential back-off
+  - TLS: not supported → SecureTCPClient with Use_TLS parameter
+  - Frame decoder: fragile string scan → full RFC-6455 parser
+  - Device routing: STRING_OUTPUT Device[] array → static broker
+  - IP wiring: Buffer_Input to every module → DeConzBroker.GatewayIP
+  - HTTP library: external HTTP_Command_Library.clz → native HttpClient
+  - Keypad 2D array bug: Button_long_release_fb[N,N] → corrected to [N]
+  - Online timeout: hardcoded → configurable parameter
+  - Threading: SIMPL+ event loop → CrestronInvoke worker threads
+
+================================================================================
+ End of Changelog
+================================================================================

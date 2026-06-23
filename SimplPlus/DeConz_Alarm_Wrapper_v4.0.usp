@@ -1,0 +1,142 @@
+/*
+  DeConz_Alarm_Wrapper_v4.0.usp
+  SIMPL+ Wrapper for DeConzAlarm (SIMPL# class)
+
+  Zigbee alarm / safety sensor module.
+  Supports ZHAAlarm, ZHAFire and ZHACarbonMonoxide as three optional endpoints.
+  Use any combination: single-type detectors or combination devices.
+
+  PARAMETERS
+    API_Key                deCONZ API key
+    Alarm_UniqueID         ZHAAlarm uniqueid (optional)
+    Fire_UniqueID          ZHAFire uniqueid (optional)
+    CO_UniqueID            ZHACarbonMonoxide uniqueid (optional)
+    Battery_UniqueID       ZHABattery uniqueid (optional)
+    Online_Timeout_Seconds default 120
+
+  DIGITAL INPUTS  (6 params → 6 SKIP)
+    Get_State / Enable_Raw_Json / Enable_Debug
+
+  DIGITAL OUTPUTS  (6 params → 6 SKIP)
+    online / alarm_fb / fire_fb / carbonmonoxide_fb
+    tampered_fb / battery_low
+
+  ANALOG OUTPUTS  (6 params → 6 SKIP)
+    Battery_state / Voltage_fb
+
+  STRING OUTPUTS  (6 params → 6 SKIP)
+    LastSeen_fb / Manufacturer_fb / ModelId_fb / Name_fb
+    alarm_raw_json / fire_raw_json / co_raw_json / battery_raw_json / Debug$
+
+  Programmer : martin@disnamic.com
+*/
+
+#SYMBOL_NAME "DeConz_Alarm v4.0"
+#CATEGORY "46" "DeConZ_Zigbee"
+#DEFAULT_VOLATILE
+#ENABLE_STACK_CHECKING
+#ENABLE_TRACE
+
+#HELP_BEGIN
+  DeConz Alarm v4.0
+  ------------------
+  Alarm, fire and CO sensor module. All endpoints are optional.
+  Use one, two or all three sensor types in a single symbol instance.
+  Combination detectors (smoke+CO) can use all three UIDs simultaneously.
+  tampered_fb fires when any active sensor reports tamper state.
+#HELP_END
+
+#USER_SIMPLSHARP_LIBRARY "DeConzZigbee"
+
+DIGITAL_INPUT  _SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,
+               Get_State, Enable_Raw_Json, Enable_Debug;
+
+DIGITAL_OUTPUT _SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,
+               online, _SKIP_,
+               alarm_fb, fire_fb, carbonmonoxide_fb, _SKIP_,
+               tampered_fb, battery_low;
+
+ANALOG_OUTPUT  Battery_state, Voltage_fb;
+
+STRING_OUTPUT  LastSeen_fb, Manufacturer_fb, ModelId_fb, Name_fb, _SKIP_,
+               alarm_raw_json, fire_raw_json, co_raw_json,
+               battery_raw_json, Debug$;
+
+STRING_PARAMETER  API_Key[40], Alarm_UniqueID[64], Fire_UniqueID[64],
+                  CO_UniqueID[64], Battery_UniqueID[64];
+INTEGER_PARAMETER Online_Timeout_Seconds;
+
+#BEGIN_PARAMETER_PROPERTIES API_Key
+  propValidUnits = unitString; propDefaultValue = "";
+  propShortDescription = "deCONZ API key";
+#END_PARAMETER_PROPERTIES
+#BEGIN_PARAMETER_PROPERTIES Alarm_UniqueID
+  propValidUnits = unitString; propDefaultValue = "";
+  propShortDescription = "ZHAAlarm uniqueid (optional)";
+#END_PARAMETER_PROPERTIES
+#BEGIN_PARAMETER_PROPERTIES Fire_UniqueID
+  propValidUnits = unitString; propDefaultValue = "";
+  propShortDescription = "ZHAFire uniqueid (optional)";
+#END_PARAMETER_PROPERTIES
+#BEGIN_PARAMETER_PROPERTIES CO_UniqueID
+  propValidUnits = unitString; propDefaultValue = "";
+  propShortDescription = "ZHACarbonMonoxide uniqueid (optional)";
+#END_PARAMETER_PROPERTIES
+#BEGIN_PARAMETER_PROPERTIES Battery_UniqueID
+  propValidUnits = unitString; propDefaultValue = "";
+  propShortDescription = "ZHABattery uniqueid (optional)";
+#END_PARAMETER_PROPERTIES
+#BEGIN_PARAMETER_PROPERTIES Online_Timeout_Seconds
+  propValidUnits = unitDecimal; propDefaultUnit = unitDecimal; propDefaultValue = 120d;
+  propShortDescription = "Seconds without WS traffic until online=0 (default 120)";
+#END_PARAMETER_PROPERTIES
+
+DeConzAlarm myAlarm;
+
+CALLBACK FUNCTION CB_Online(INTEGER v)          { online            = v; }
+CALLBACK FUNCTION CB_AlarmFb(INTEGER v)         { alarm_fb          = v; }
+CALLBACK FUNCTION CB_FireFb(INTEGER v)          { fire_fb           = v; }
+CALLBACK FUNCTION CB_COFb(INTEGER v)            { carbonmonoxide_fb = v; }
+CALLBACK FUNCTION CB_TamperedFb(INTEGER v)      { tampered_fb       = v; }
+CALLBACK FUNCTION CB_BatteryLow(INTEGER v)      { battery_low       = v; }
+CALLBACK FUNCTION CB_BatteryLevel(INTEGER v)    { Battery_state     = v; }
+CALLBACK FUNCTION CB_VoltageFb(INTEGER v)       { Voltage_fb        = v; }
+CALLBACK FUNCTION CB_LastSeen(STRING s)         { LastSeen_fb       = s; }
+CALLBACK FUNCTION CB_Mfr(STRING s)             { Manufacturer_fb   = s; }
+CALLBACK FUNCTION CB_ModelId(STRING s)         { ModelId_fb        = s; }
+CALLBACK FUNCTION CB_Name(STRING s)            { Name_fb           = s; }
+CALLBACK FUNCTION CB_AlarmRaw(STRING s)        { alarm_raw_json    = s; }
+CALLBACK FUNCTION CB_FireRaw(STRING s)         { fire_raw_json     = s; }
+CALLBACK FUNCTION CB_CORaw(STRING s)           { co_raw_json       = s; }
+CALLBACK FUNCTION CB_BattRaw(STRING s)         { battery_raw_json  = s; }
+CALLBACK FUNCTION CB_Debug(STRING s)           { Debug$            = s; }
+
+PUSH Get_State { myAlarm.GetState(); }
+CHANGE Enable_Raw_Json { myAlarm.SetRawJsonEnabled(Enable_Raw_Json); }
+CHANGE Enable_Debug    { myAlarm.SetDebug(Enable_Debug); }
+
+Function Main()
+{
+  WaitForInitializationComplete();
+  RegisterDelegate(myAlarm, OnOnline,           CB_Online);
+  RegisterDelegate(myAlarm, OnAlarmFb,          CB_AlarmFb);
+  RegisterDelegate(myAlarm, OnFireFb,           CB_FireFb);
+  RegisterDelegate(myAlarm, OnCarbonMonoxideFb, CB_COFb);
+  RegisterDelegate(myAlarm, OnTamperedFb,       CB_TamperedFb);
+  RegisterDelegate(myAlarm, OnBatteryLow,       CB_BatteryLow);
+  RegisterDelegate(myAlarm, OnBatteryLevel,     CB_BatteryLevel);
+  RegisterDelegate(myAlarm, OnVoltageFb,        CB_VoltageFb);
+  RegisterDelegate(myAlarm, OnLastSeenFb,       CB_LastSeen);
+  RegisterDelegate(myAlarm, OnManufacturerFb,   CB_Mfr);
+  RegisterDelegate(myAlarm, OnModelIdFb,        CB_ModelId);
+  RegisterDelegate(myAlarm, OnNameFb,           CB_Name);
+  RegisterDelegate(myAlarm, OnAlarmRawJson,     CB_AlarmRaw);
+  RegisterDelegate(myAlarm, OnFireRawJson,      CB_FireRaw);
+  RegisterDelegate(myAlarm, OnCORawJson,        CB_CORaw);
+  RegisterDelegate(myAlarm, OnBatteryRawJson,   CB_BattRaw);
+  RegisterDelegate(myAlarm, OnDebugOut,         CB_Debug);
+  myAlarm.SetOnlineTimeout(Online_Timeout_Seconds);
+  myAlarm.SetRawJsonEnabled(Enable_Raw_Json);
+  myAlarm.SetDebug(Enable_Debug);
+  myAlarm.Initialize(Alarm_UniqueID, Fire_UniqueID, CO_UniqueID, Battery_UniqueID, API_Key);
+}

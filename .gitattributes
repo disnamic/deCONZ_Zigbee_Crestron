@@ -1,0 +1,24 @@
+# Normalize text files in the repository; convert per-platform on checkout.
+* text=auto
+
+# Crestron SIMPL+ wrappers MUST be CRLF on disk.
+# LF line endings make the SIMPL+ compiler fail with Error 1700.
+*.usp text eol=crlf
+
+# Visual Studio / C# toolchain files: CRLF on checkout (Windows).
+*.cs     text eol=crlf
+*.csproj text eol=crlf
+*.sln    text eol=crlf
+*.config text eol=crlf
+
+# Documentation kept as LF (matches current files).
+*.md  text eol=lf
+*.txt text eol=lf
+
+# Binary files: never convert line endings.
+*.clz binary
+*.dll binary
+*.pdb binary
+*.dat binary
+*.smw binary
+*.zip binary
