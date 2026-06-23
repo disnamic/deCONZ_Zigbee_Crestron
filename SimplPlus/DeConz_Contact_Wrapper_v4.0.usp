@@ -1,0 +1,175 @@
+/*
+  DeConz_Contact_Wrapper_v4.0.usp
+  SIMPL+ Wrapper for DeConzContact (SIMPL# class)
+
+  Zigbee door/window contact sensor (ZHAOpenClose).
+  Feedback via WebSocket (DeConzBroker) + HTTP GET.
+  State polled automatically on connect/reconnect (random 1-15 s)
+  and every 30 minutes. Pulse Get_State for immediate refresh.
+
+  DIGITAL INPUTS (3 params → 3 SKIP)
+    _SKIP_,_SKIP_,_SKIP_,
+    Get_State       Pulse → HTTP GET
+    Enable_Debug    High  → debug on Debug$
+
+  DIGITAL OUTPUTS (3 params → 3 SKIP)
+    _SKIP_,_SKIP_,_SKIP_,
+    online          1 = WS alive
+    open_fb         1 = contact open
+    closed_fb       1 = contact closed
+    battery_low     1 = low battery
+
+  ANALOG OUTPUTS (3 params → 3 SKIP)
+    _SKIP_,_SKIP_,_SKIP_,
+    Battery_state   0-100 %
+    Voltage_fb      mV (ZHABattery, if configured)
+
+  STRING OUTPUTS (3 params → 3 SKIP)
+    _SKIP_,_SKIP_,_SKIP_,
+    device_id_fb / LastSeen_fb / LastAnnounced_fb /
+    Manufacturer_fb / ModelId_fb / Name_fb / Type_fb /
+    _SKIP_,
+    raw_json_out / battery_raw_json / Debug$
+
+  PARAMETERS
+    API_Key                 deCONZ API key
+    Device_UniqueID         ZHAOpenClose sensor uniqueid
+    Battery_UniqueID        ZHABattery sensor uniqueid (optional)
+    Online_Timeout_Seconds  default 120
+
+  Programmer : martin@disnamic.com
+*/
+
+#SYMBOL_NAME "DeConz_Contact v4.0"
+#CATEGORY "46" "DeConZ_Zigbee"
+
+#DEFAULT_VOLATILE
+#ENABLE_STACK_CHECKING
+#ENABLE_TRACE
+
+#HELP_BEGIN
+  DeConz Contact v4.0
+  ---------------------
+  Zigbee door/window contact sensor (ZHAOpenClose).
+  open_fb = 1 when contact is open (door/window open).
+  closed_fb = 1 when contact is closed.
+
+  State polled automatically on WS connect/reconnect (random 1-15 s delay)
+  and every 30 minutes. Pulse Get_State for an immediate refresh.
+
+  Battery_UniqueID: optional separate ZHABattery endpoint.
+  Leave empty if battery is reported on the sensor endpoint itself.
+#HELP_END
+
+#USER_SIMPLSHARP_LIBRARY "DeConzZigbee"
+
+/*****
+  I/O Declarations
+  4 parameters → 4 _SKIP_ before first signal
+*/
+DIGITAL_INPUT  _SKIP_,_SKIP_,_SKIP_,_SKIP_,
+               Get_State, Enable_Debug, Enable_Raw_Json;
+
+DIGITAL_OUTPUT _SKIP_,_SKIP_,_SKIP_,_SKIP_,
+               online, open_fb, closed_fb, battery_low;
+
+ANALOG_OUTPUT  Battery_state, Voltage_fb;
+
+STRING_OUTPUT  device_id_fb, LastSeen_fb, LastAnnounced_fb,
+               Manufacturer_fb, ModelId_fb, Name_fb, Type_fb,
+               _SKIP_,
+               raw_json_out, battery_raw_json, Debug$;
+
+/*****
+  Parameters
+*/
+STRING_PARAMETER  API_Key[40], Device_UniqueID[64], Battery_UniqueID[64];
+INTEGER_PARAMETER Online_Timeout_Seconds;
+
+#BEGIN_PARAMETER_PROPERTIES API_Key
+  propValidUnits       = unitString;
+  propDefaultValue     = "";
+  propShortDescription = "deCONZ API key (Phoscon App → Settings → Gateway → Advanced)";
+#END_PARAMETER_PROPERTIES
+
+#BEGIN_PARAMETER_PROPERTIES Device_UniqueID
+  propValidUnits       = unitString;
+  propDefaultValue     = "00:00:00:00:00:00:00:00-01";
+  propShortDescription = "ZHAOpenClose sensor uniqueid";
+#END_PARAMETER_PROPERTIES
+
+#BEGIN_PARAMETER_PROPERTIES Battery_UniqueID
+  propValidUnits       = unitString;
+  propDefaultValue     = "";
+  propShortDescription = "ZHABattery sensor uniqueid (optional – leave empty if not separate)";
+#END_PARAMETER_PROPERTIES
+
+#BEGIN_PARAMETER_PROPERTIES Online_Timeout_Seconds
+  propValidUnits       = unitDecimal;
+  propDefaultUnit      = unitDecimal;
+  propDefaultValue     = 120d;
+  propShortDescription = "Seconds without WS traffic until online→0 (default 120)";
+#END_PARAMETER_PROPERTIES
+
+/*****
+  SIMPL# Object
+*/
+DeConzContact myContact;
+
+/*****
+  Delegate Callbacks
+*/
+CALLBACK FUNCTION CB_Online(INTEGER v)       { online          = v; }
+CALLBACK FUNCTION CB_OpenFb(INTEGER v)       { open_fb         = v; }
+CALLBACK FUNCTION CB_ClosedFb(INTEGER v)     { closed_fb       = v; }
+CALLBACK FUNCTION CB_BatteryLow(INTEGER v)   { battery_low     = v; }
+CALLBACK FUNCTION CB_BatteryLevel(INTEGER v) { Battery_state   = v; }
+CALLBACK FUNCTION CB_VoltageFb(INTEGER v)    { Voltage_fb      = v; }
+
+CALLBACK FUNCTION CB_DeviceId(STRING s)      { device_id_fb     = s; }
+CALLBACK FUNCTION CB_LastSeen(STRING s)      { LastSeen_fb      = s; }
+CALLBACK FUNCTION CB_LastAnn(STRING s)       { LastAnnounced_fb = s; }
+CALLBACK FUNCTION CB_Mfr(STRING s)          { Manufacturer_fb  = s; }
+CALLBACK FUNCTION CB_ModelId(STRING s)      { ModelId_fb       = s; }
+CALLBACK FUNCTION CB_Name(STRING s)         { Name_fb          = s; }
+CALLBACK FUNCTION CB_Type(STRING s)         { Type_fb          = s; }
+CALLBACK FUNCTION CB_RawJson(STRING s)      { raw_json_out     = s; }
+CALLBACK FUNCTION CB_BattRaw(STRING s)      { battery_raw_json = s; }
+CALLBACK FUNCTION CB_Debug(STRING s)        { Debug$           = s; }
+
+/*****
+  Input Handlers
+*/
+PUSH Get_State  { myContact.GetState(); }
+CHANGE Enable_Debug { myContact.SetDebug(Enable_Debug); }
+CHANGE Enable_Raw_Json { myContact.SetRawJsonEnabled(Enable_Raw_Json); }
+
+/*****
+  Main
+*/
+Function Main()
+{
+  WaitForInitializationComplete();
+
+  RegisterDelegate(myContact, OnOnline,          CB_Online);
+  RegisterDelegate(myContact, OnOpenFb,          CB_OpenFb);
+  RegisterDelegate(myContact, OnClosedFb,        CB_ClosedFb);
+  RegisterDelegate(myContact, OnBatteryLow,      CB_BatteryLow);
+  RegisterDelegate(myContact, OnBatteryLevel,    CB_BatteryLevel);
+  RegisterDelegate(myContact, OnVoltageFb,       CB_VoltageFb);
+  RegisterDelegate(myContact, OnDeviceIdFb,      CB_DeviceId);
+  RegisterDelegate(myContact, OnLastSeenFb,      CB_LastSeen);
+  RegisterDelegate(myContact, OnLastAnnouncedFb, CB_LastAnn);
+  RegisterDelegate(myContact, OnManufacturerFb,  CB_Mfr);
+  RegisterDelegate(myContact, OnModelIdFb,       CB_ModelId);
+  RegisterDelegate(myContact, OnNameFb,          CB_Name);
+  RegisterDelegate(myContact, OnTypeFb,          CB_Type);
+  RegisterDelegate(myContact, OnRawJsonFb,       CB_RawJson);
+  RegisterDelegate(myContact, OnBatteryRawJson,  CB_BattRaw);
+  RegisterDelegate(myContact, OnDebugOut,        CB_Debug);
+
+  myContact.SetOnlineTimeout(Online_Timeout_Seconds);
+  myContact.SetRawJsonEnabled(Enable_Raw_Json);
+  myContact.Initialize(Device_UniqueID, Battery_UniqueID, API_Key);
+  myContact.SetDebug(Enable_Debug);
+}

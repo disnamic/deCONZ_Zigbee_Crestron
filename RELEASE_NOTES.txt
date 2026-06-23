@@ -1,0 +1,203 @@
+================================================================================
+ DeConz Zigbee – Crestron SIMPL# Module Suite
+ Version 4.0.0
+ 2026-06-23
+================================================================================
+
+This major release moves the whole suite to the v4.0 symbol generation and adds
+two gateway connection parameters. There are no new device modules and no new
+device features over 3.6.0 — see the sections below for the full feature history.
+
+--------------------------------------------------------------------------------
+ What is new in 4.0
+--------------------------------------------------------------------------------
+
+Symbol rename to the v4.0 generation (breaking in SIMPL Windows)
+  All 14 module symbols are renamed: #SYMBOL_NAME and the .usp filenames now
+  carry "v4.0". Existing symbols in a SIMPL Windows program must be replaced
+  with the v4.0 symbols and their signal connections re-checked.
+
+Gateway – two new parameters
+  Alive_Timeout_Seconds (default 15, range 5-3600) sets the seconds without WS
+  traffic before websocket_traffic_present drops to 0; it was previously
+  hardcoded. Use_TLS (0 = ws://, 1 = wss://) selects the WebSocket scheme. Both
+  shift the gateway symbol's signal layout, so re-check the gateway connections.
+
+Build
+  Retargeted to .NET Framework 4.8 (was 4.7.2). AssemblyVersion 4.0.0.0.
+
+Build fixes (required for the v4.0 sources to compile)
+  Restored a missing debug field in the Device module, the stale-reset Fire
+  helpers in the Keypad module, a "DebugDebugLog" typo in three modules and an
+  undefined identifier in the Shade open/closed comparison. The Light_WS wrapper
+  regained its LastAnnounced_fb, SwVersion_fb and Type_fb outputs (present in the
+  class since v2.11.0 but dropped from the v4.0 wrapper declaration).
+
+--------------------------------------------------------------------------------
+ What is new in 3.6
+--------------------------------------------------------------------------------
+
+Stale-value reset across ten device modules
+  When no update is received from a device for more than one hour, the module
+  resets its live value and status outputs so the touch panel no longer shows
+  outdated readings. A per-module timer checks every five minutes; the reset
+  fires once and re-arms as soon as fresh data arrives. Device identity,
+  timestamps, capabilities, configuration / setpoints, cumulative meters and raw
+  JSON outputs are preserved. GroupControl, Scene and Device are not affected.
+  No wrapper signal changes.
+
+--------------------------------------------------------------------------------
+ What is new in 3.5
+--------------------------------------------------------------------------------
+
+Performance and memory hardening
+  HTTP responses are now disposed in every callback, fixing a handle leak over
+  long-term operation. Payload-carrying debug logs are guarded so the full JSON
+  string is not built when debug is off, removing avoidable GC pressure on busy
+  sensors. Static device info (manufacturer, model, name, type, swversion) is
+  parsed once instead of on every WebSocket event. No functional signal changes.
+
+--------------------------------------------------------------------------------
+ What is new in 3.3
+--------------------------------------------------------------------------------
+
+DeConzMotion – extended ZHAPresence configuration
+  New commands for enabling/disabling the sensor, LED indication and user
+  test mode. Sensitivity and delay configurable via analog inputs at runtime.
+  Sensitivity_Max_fb reports the device's maximum sensitivity value (readonly).
+  Sensitivity and delay are Philips-specific; ignored by other brands.
+
+--------------------------------------------------------------------------------
+ What is new in 3.2
+--------------------------------------------------------------------------------
+
+DeConzThermostat – extended with additional fields and commands
+  New commands: valve override (setvalve), schedule enable/disable, display
+  flip and external temperature input. New feedback outputs: window open
+  detected (state.windowopen), schedule active, valve override active,
+  display flipped and error code. Total: 34 delegates.
+
+DeConzShade – configurable open/closed thresholds
+  Two new parameters Open_Threshold (default 1) and Closed_Threshold
+  (default 99) replace hardcoded values. No breaking change for existing
+  installations.
+
+Raw JSON output chunking across all modules
+  All raw JSON outputs now deliver content in 250-character chunks instead
+  of truncating or delivering as one potentially oversized string.
+
+--------------------------------------------------------------------------------
+ Fixes in 3.1.1 and 3.1.2
+--------------------------------------------------------------------------------
+
+Raw JSON output now correctly respects Enable_Raw_Json
+  Enable_Raw_Json was ineffective in several modules. Two separate issues were
+  fixed: FireRawJson() in DeConzLightWs was missing its guard entirely, and in
+  seven wrappers SetRawJsonEnabled() was called after Initialize(), meaning the
+  flag was not set before the first broker callback could fire.
+
+Console output gated behind Enable_Debug across all modules
+  Operational messages (Initialized, GetState in X s, Resolved id, Battery
+  resolved, online timeout, etc.) were printed unconditionally to the Crestron
+  console regardless of the Enable_Debug signal. These are now suppressed when
+  debug is off. Only genuine errors remain visible without debug enabled.
+
+--------------------------------------------------------------------------------
+ What is new in 3.1
+--------------------------------------------------------------------------------
+
+DeConzMotion – Presence and light level sensor
+  Combines a ZHAPresence and a ZHALightLevel endpoint in one symbol. Both are
+  optional. Outputs presence, tampered, lux, lightlevel, dark and daylight.
+  The presence timeout (duration) and light level thresholds (tholddark,
+  tholdoffset) are writable via analog inputs at runtime. State is fetched on
+  connect and reconnect; no background poll is used.
+
+DeConzPower – Smart plug and power meter
+  Supports an on/off switch endpoint alongside ZHAPower (W, V, A) and
+  ZHAConsumption (cumulative Wh plus instantaneous W). All three endpoints are
+  optional. On/Off commands and feedback work identically to the valve module.
+  The consumption value is a hardware counter that cannot be reset through the
+  deCONZ API; implement a software offset in SIMPL+ logic for a reset function.
+  Consumption_fb is in watt-hours; divide by 1000 for kWh display.
+
+DeConzAlarm – Alarm, fire and carbon monoxide sensors
+  One symbol covers ZHAAlarm, ZHAFire and ZHACarbonMonoxide as three
+  independent optional endpoints. Suitable for single-type detectors and for
+  combination devices that expose all three sensor types under different
+  uniqueids. Tampered flag and battery state are shared across all active
+  endpoints.
+
+Group and scene management (completed from v3.0)
+  DeConzGroupControl now supports creating groups, renaming, setting members,
+  listing all groups and deleting. DeConzScene now supports creating scenes,
+  deleting, renaming and reading single scene attributes. Both modules use
+  string inputs for names and member lists, analog inputs for IDs, and pulse
+  inputs for each operation.
+
+--------------------------------------------------------------------------------
+ First public release (3.0)
+--------------------------------------------------------------------------------
+
+  - 11 device and control modules covering lights, keypads, valves, shades,
+    thermostats, climate sensors, contact sensors, groups and scenes, plus a
+    generic raw-JSON device module.
+  - Static multicast broker, RFC-6455 WebSocket client, shared JSON parser.
+  - Signed temperature output for Climate and Thermostat modules.
+  - Complete English documentation, CHANGELOG and release notes.
+
+--------------------------------------------------------------------------------
+ Module overview (14 modules)
+--------------------------------------------------------------------------------
+
+  Gateway          WebSocket connection to deCONZ gateway
+  Device           Generic raw-JSON passthrough, up to 6 uniqueids
+  Light_WS         Light control with WebSocket feedback
+  Keypad           Zigbee keypads and remotes
+  Valve            Irrigation valve with water sensor
+  Shade            Window coverings with optional battery sensor
+  Thermostat       ZHAThermostat with setpoints, mode, lock
+  Climate          Temperature, humidity and pressure sensors
+  Contact          Door/window contact sensor (ZHAOpenClose)
+  Motion           Presence and light level (ZHAPresence + ZHALightLevel)
+  Power            Smart plug with power metering
+  Alarm            Alarm, fire and CO safety sensors
+  Group_Control    Light group control and management
+  Scene            Scene recall, store and management
+
+--------------------------------------------------------------------------------
+ Requirements
+--------------------------------------------------------------------------------
+
+  - Crestron 4-Series control system
+  - deCONZ gateway (ConBee / RaspBee with Phoscon)
+  - deCONZ API key and Zigbee uniqueid of each device
+
+--------------------------------------------------------------------------------
+ Installation
+--------------------------------------------------------------------------------
+
+  Copy DeConzZigbee.clz into the SIMPL project folder, add the desired
+  DeConz_*_Wrapper symbols and set their parameters. No signal wiring between
+  the gateway module and the device modules is required.
+
+  Uniqueids and API key: Phoscon app at http://<gateway-ip>/pwa/
+  Group and scene IDs: visible in Phoscon group and scene configuration.
+
+--------------------------------------------------------------------------------
+ Notes
+--------------------------------------------------------------------------------
+
+  - Temperature analog outputs (Climate, Thermostat) carry negative values as
+    16-bit two's-complement. Read as a signed analog in SIMPL+. The string
+    outputs always show the correct signed value for display.
+
+  - One Gateway module per program. All device modules share the connection.
+
+  - Consumption_fb in DeConzPower is in watt-hours (Wh). Divide by 1000 for
+    kWh. Reset is not possible via the API; use a SIMPL+ offset for this.
+
+See CHANGELOG.txt for the complete version history.
+
+Contact: martin@disnamic.com
+================================================================================

@@ -1,0 +1,32 @@
+# Build output
+[Bb]in/
+[Oo]bj/
+
+# NuGet packages (restored from packages.config via `nuget restore` / MSBuild)
+packages/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# SIMPL+ compiler intermediate / output
+SPlsWork/
+
+# SIMPL+ generated headers and the built library copy
+*.ush
+*.clz
+
+# SIMPL Windows generated / compiled artifacts.
+# The .smw program source IS tracked (acceptance program); its siblings are not.
+*.lpz
+*.lpz.hash
+*.sig
+*.sm2
+*.smft
+*.ASV
+*_archive.zip
+*_compiled.zip
+
+# Claude Code local (machine-specific) settings
+.claude/settings.local.json
