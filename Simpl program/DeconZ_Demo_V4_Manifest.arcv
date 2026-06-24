@@ -1,0 +1,103 @@
+[BEGIN]
+  ObjTp=FSgntr
+  Sgntr=ArchiveManifest
+  RelVrs=4.3200.02
+  IsProgram=1
+  TopLevelProgram=DeconZ_Demo_V4.smw
+[END]
+[BEGIN]
+  ObjTp=ArchiveItem
+  File=DeconZ_Demo_V4.smw
+  Scope=1
+[END]
+[BEGIN]
+  ObjTp=ArchiveItem
+  File=DeconZ_Demo_V4.sig
+  Scope=1
+[END]
+[BEGIN]
+  ObjTp=ArchiveItem
+  File=DeconZ_Demo_V4.lpz
+  Scope=1
+[END]
+[BEGIN]
+  ObjTp=ArchiveItem
+  File=DeconZ_Demo_V4.smft
+  Scope=1
+[END]
+[BEGIN]
+  ObjTp=ArchiveItem
+  File=DeconZ_Demo_V4.lpz.hash
+  Scope=1
+[END]
+[BEGIN]
+  ObjTp=ArchiveItem
+  File=DeConz_Contact_Wrapper_v4.0.ush
+  Scope=1
+[END]
+[BEGIN]
+  ObjTp=ArchiveItem
+  File=DeConzZigbee.clz
+  Scope=1
+  Module=DeConz_Contact_Wrapper_v4.0.ush
+[END]
+[BEGIN]
+  ObjTp=ArchiveItem
+  File=DeConz_Climate_Wrapper_v4.0.ush
+  Scope=1
+[END]
+[BEGIN]
+  ObjTp=ArchiveItem
+  File=DeConz_Device_Wrapper_v4.0.ush
+  Scope=1
+[END]
+[BEGIN]
+  ObjTp=ArchiveItem
+  File=DeConz_Gateway_Wrapper_v4.0.ush
+  Scope=1
+[END]
+[BEGIN]
+  ObjTp=ArchiveItem
+  File=DeConz_Group_Control_Wrapper_v4.0.ush
+  Scope=1
+[END]
+[BEGIN]
+  ObjTp=ArchiveItem
+  File=DeConz_Keypad_Wrapper_v4.0.ush
+  Scope=1
+[END]
+[BEGIN]
+  ObjTp=ArchiveItem
+  File=DeConz_Light_WS_Wrapper_v4.0.ush
+  Scope=1
+[END]
+[BEGIN]
+  ObjTp=ArchiveItem
+  File=DeConz_Motion_Wrapper_v4.0.ush
+  Scope=1
+[END]
+[BEGIN]
+  ObjTp=ArchiveItem
+  File=DeConz_Power_Wrapper_v4.0.ush
+  Scope=1
+[END]
+[BEGIN]
+  ObjTp=ArchiveItem
+  File=DeConz_Scene_Wrapper_v4.0.ush
+  Scope=1
+[END]
+[BEGIN]
+  ObjTp=ArchiveItem
+  File=DeConz_Shade_Wrapper_v4.0.ush
+  Scope=1
+[END]
+[BEGIN]
+  ObjTp=ArchiveItem
+  File=DeConz_Thermostat_Wrapper_v4.0.ush
+  Scope=1
+[END]
+[BEGIN]
+  ObjTp=ArchiveItem
+  File=DeConz_Valve_Wrapper_v4.0.ush
+  Scope=1
+[END]
