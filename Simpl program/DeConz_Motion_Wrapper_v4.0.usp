@@ -1,0 +1,184 @@
+/*
+  DeConz_Motion_Wrapper_v4.0.usp
+  SIMPL+ Wrapper for DeConzMotion (SIMPL# class)
+
+  Zigbee presence / motion + light level sensor.
+  ZHAPresence and ZHALightLevel as two optional endpoints in one module.
+  State fetched on WS connect/reconnect (random 1-15 s). No background poll.
+
+  PARAMETERS
+    API_Key               deCONZ API key
+    Presence_UniqueID     ZHAPresence sensor uniqueid (optional)
+    LightLevel_UniqueID   ZHALightLevel sensor uniqueid (optional)
+    Battery_UniqueID      ZHABattery sensor uniqueid (optional)
+    Online_Timeout_Seconds  default 120
+
+  DIGITAL INPUTS  (5 params → 5 SKIP)
+    Get_State         Pulse → HTTP GET all active endpoints
+    Enable_Raw_Json   High → raw JSON outputs active
+    Enable_Debug      High → debug on Debug$
+
+  ANALOG INPUTS  (5 params → 5 SKIP)
+    Duration_In       Presence timeout in seconds (PUT config.duration)
+    Thold_Dark        LightLevel threshold for dark flag (PUT config.tholddark)
+    Thold_Offset      Offset above dark threshold for daylight (PUT config.tholdoffset)
+
+  DIGITAL OUTPUTS  (5 params → 5 SKIP)
+    online            1 = WS alive
+    presence_fb       1 = presence detected
+    tampered_fb       1 = sensor tampered
+    dark_fb           1 = below dark threshold
+    daylight_fb       1 = above daylight threshold
+    battery_low       1 = low battery
+
+  ANALOG OUTPUTS  (5 params → 5 SKIP)
+    Lux_fb            lux value
+    Lightlevel_fb     raw lightlevel value
+    Battery_state     0-100 %
+    Voltage_fb        mV (ZHABattery)
+
+  STRING OUTPUTS  (5 params → 5 SKIP)
+    LastSeen_fb / Manufacturer_fb / ModelId_fb / Name_fb
+    presence_raw_json / light_raw_json / battery_raw_json / Debug$
+
+  Programmer : martin@disnamic.com
+*/
+
+#SYMBOL_NAME "DeConz_Motion v4.0"
+#CATEGORY "46" "DeConZ_Zigbee"
+#DEFAULT_VOLATILE
+#ENABLE_STACK_CHECKING
+#ENABLE_TRACE
+
+#HELP_BEGIN
+  DeConz Motion v4.0
+  -------------------
+  Presence + light level sensor. Both endpoints are optional.
+  Duration_In: seconds until presence resets to false after last detection.
+  Thold_Dark / Thold_Offset: lightlevel thresholds for dark_fb and daylight_fb.
+  Pulse the inputs to send the config value to the sensor immediately.
+#HELP_END
+
+#USER_SIMPLSHARP_LIBRARY "DeConzZigbee"
+
+DIGITAL_INPUT  _SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,
+               Sensor_On, Sensor_Off, _SKIP_,
+               Led_On, Led_Off, _SKIP_,
+               User_Test_On, User_Test_Off, _SKIP_,
+               Get_State, Enable_Raw_Json, Enable_Debug;
+
+ANALOG_INPUT   Duration_In, Thold_Dark, Thold_Offset,
+               Sensitivity_In, Delay_In;
+
+DIGITAL_OUTPUT _SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,
+               online, presence_fb, tampered_fb,
+               dark_fb, daylight_fb, battery_low,
+               sensor_on_fb, led_indication_fb, user_test_fb;
+
+ANALOG_OUTPUT  Lux_fb, Lightlevel_fb, Battery_state, Voltage_fb,
+               Sensitivity_fb, Sensitivity_Max_fb, Delay_fb;
+
+STRING_OUTPUT  LastSeen_fb, Manufacturer_fb, ModelId_fb, Name_fb, _SKIP_,
+               presence_raw_json, light_raw_json, battery_raw_json, Debug$;
+
+STRING_PARAMETER  API_Key[40], Presence_UniqueID[64],
+                  LightLevel_UniqueID[64], Battery_UniqueID[64];
+INTEGER_PARAMETER Online_Timeout_Seconds;
+
+#BEGIN_PARAMETER_PROPERTIES API_Key
+  propValidUnits = unitString; propDefaultValue = "";
+  propShortDescription = "deCONZ API key";
+#END_PARAMETER_PROPERTIES
+#BEGIN_PARAMETER_PROPERTIES Presence_UniqueID
+  propValidUnits = unitString; propDefaultValue = "";
+  propShortDescription = "ZHAPresence uniqueid (optional)";
+#END_PARAMETER_PROPERTIES
+#BEGIN_PARAMETER_PROPERTIES LightLevel_UniqueID
+  propValidUnits = unitString; propDefaultValue = "";
+  propShortDescription = "ZHALightLevel uniqueid (optional)";
+#END_PARAMETER_PROPERTIES
+#BEGIN_PARAMETER_PROPERTIES Battery_UniqueID
+  propValidUnits = unitString; propDefaultValue = "";
+  propShortDescription = "ZHABattery uniqueid (optional)";
+#END_PARAMETER_PROPERTIES
+#BEGIN_PARAMETER_PROPERTIES Online_Timeout_Seconds
+  propValidUnits = unitDecimal; propDefaultUnit = unitDecimal; propDefaultValue = 120d;
+  propShortDescription = "Seconds without WS traffic until online=0 (default 120)";
+#END_PARAMETER_PROPERTIES
+
+DeConzMotion myMotion;
+
+CALLBACK FUNCTION CB_Online(INTEGER v)       { online              = v; }
+CALLBACK FUNCTION CB_PresenceFb(INTEGER v)   { presence_fb         = v; }
+CALLBACK FUNCTION CB_TamperedFb(INTEGER v)   { tampered_fb         = v; }
+CALLBACK FUNCTION CB_DarkFb(INTEGER v)       { dark_fb             = v; }
+CALLBACK FUNCTION CB_DaylightFb(INTEGER v)   { daylight_fb         = v; }
+CALLBACK FUNCTION CB_BatteryLow(INTEGER v)       { battery_low        = v; }
+CALLBACK FUNCTION CB_SensorOnFb(INTEGER v)       { sensor_on_fb       = v; }
+CALLBACK FUNCTION CB_LedIndicationFb(INTEGER v)  { led_indication_fb  = v; }
+CALLBACK FUNCTION CB_UserTestFb(INTEGER v)       { user_test_fb       = v; }
+CALLBACK FUNCTION CB_SensitivityFb(INTEGER v)    { Sensitivity_fb     = v; }
+CALLBACK FUNCTION CB_SensitivityMaxFb(INTEGER v) { Sensitivity_Max_fb = v; }
+CALLBACK FUNCTION CB_DelayFb(INTEGER v)          { Delay_fb           = v; }
+CALLBACK FUNCTION CB_LuxFb(INTEGER v)        { Lux_fb              = v; }
+CALLBACK FUNCTION CB_LightlevelFb(INTEGER v) { Lightlevel_fb       = v; }
+CALLBACK FUNCTION CB_BatteryLevel(INTEGER v) { Battery_state       = v; }
+CALLBACK FUNCTION CB_VoltageFb(INTEGER v)    { Voltage_fb          = v; }
+CALLBACK FUNCTION CB_LastSeen(STRING s)      { LastSeen_fb         = s; }
+CALLBACK FUNCTION CB_Mfr(STRING s)          { Manufacturer_fb     = s; }
+CALLBACK FUNCTION CB_ModelId(STRING s)      { ModelId_fb          = s; }
+CALLBACK FUNCTION CB_Name(STRING s)         { Name_fb             = s; }
+CALLBACK FUNCTION CB_PresRaw(STRING s)      { presence_raw_json   = s; }
+CALLBACK FUNCTION CB_LightRaw(STRING s)     { light_raw_json      = s; }
+CALLBACK FUNCTION CB_BattRaw(STRING s)      { battery_raw_json    = s; }
+CALLBACK FUNCTION CB_Debug(STRING s)        { Debug$              = s; }
+
+PUSH Get_State { myMotion.GetState(); }
+CHANGE Enable_Raw_Json { myMotion.SetRawJsonEnabled(Enable_Raw_Json); }
+CHANGE Enable_Debug    { myMotion.SetDebug(Enable_Debug); }
+
+PUSH Sensor_On      { myMotion.SetSensorOn(1);       }
+PUSH Sensor_Off     { myMotion.SetSensorOn(0);       }
+PUSH Led_On         { myMotion.SetLedIndication(1);  }
+PUSH Led_Off        { myMotion.SetLedIndication(0);  }
+PUSH User_Test_On   { myMotion.SetUserTest(1);       }
+PUSH User_Test_Off  { myMotion.SetUserTest(0);       }
+
+THREADSAFE CHANGE Duration_In    { myMotion.SetDuration(Duration_In);       }
+THREADSAFE CHANGE Thold_Dark   { myMotion.SetTholdDark(Thold_Dark);     }
+THREADSAFE CHANGE Thold_Offset    { myMotion.SetTholdOffset(Thold_Offset);       }
+THREADSAFE CHANGE Sensitivity_In  { myMotion.SetSensitivity(Sensitivity_In);     }
+THREADSAFE CHANGE Delay_In        { myMotion.SetDelay(Delay_In);                 }
+
+Function Main()
+{
+  WaitForInitializationComplete();
+  RegisterDelegate(myMotion, OnOnline,          CB_Online);
+  RegisterDelegate(myMotion, OnPresenceFb,      CB_PresenceFb);
+  RegisterDelegate(myMotion, OnTamperedFb,      CB_TamperedFb);
+  RegisterDelegate(myMotion, OnDarkFb,          CB_DarkFb);
+  RegisterDelegate(myMotion, OnDaylightFb,      CB_DaylightFb);
+  RegisterDelegate(myMotion, OnBatteryLow,       CB_BatteryLow);
+  RegisterDelegate(myMotion, OnSensorOnFb,       CB_SensorOnFb);
+  RegisterDelegate(myMotion, OnLedIndicationFb,  CB_LedIndicationFb);
+  RegisterDelegate(myMotion, OnUserTestFb,       CB_UserTestFb);
+  RegisterDelegate(myMotion, OnSensitivityFb,    CB_SensitivityFb);
+  RegisterDelegate(myMotion, OnSensitivityMaxFb, CB_SensitivityMaxFb);
+  RegisterDelegate(myMotion, OnDelayFb,          CB_DelayFb);
+  RegisterDelegate(myMotion, OnLuxFb,           CB_LuxFb);
+  RegisterDelegate(myMotion, OnLightlevelFb,    CB_LightlevelFb);
+  RegisterDelegate(myMotion, OnBatteryLevel,    CB_BatteryLevel);
+  RegisterDelegate(myMotion, OnVoltageFb,       CB_VoltageFb);
+  RegisterDelegate(myMotion, OnLastSeenFb,      CB_LastSeen);
+  RegisterDelegate(myMotion, OnManufacturerFb,  CB_Mfr);
+  RegisterDelegate(myMotion, OnModelIdFb,       CB_ModelId);
+  RegisterDelegate(myMotion, OnNameFb,          CB_Name);
+  RegisterDelegate(myMotion, OnPresenceRawJson, CB_PresRaw);
+  RegisterDelegate(myMotion, OnLightRawJson,    CB_LightRaw);
+  RegisterDelegate(myMotion, OnBatteryRawJson,  CB_BattRaw);
+  RegisterDelegate(myMotion, OnDebugOut,        CB_Debug);
+  myMotion.SetOnlineTimeout(Online_Timeout_Seconds);
+  myMotion.SetRawJsonEnabled(Enable_Raw_Json);
+  myMotion.SetDebug(Enable_Debug);
+  myMotion.Initialize(Presence_UniqueID, LightLevel_UniqueID, Battery_UniqueID, API_Key);
+}

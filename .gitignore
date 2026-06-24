@@ -30,3 +30,8 @@ SPlsWork/
 
 # Claude Code local (machine-specific) settings
 .claude/settings.local.json
+
+# Simpl program/ is the packaged demo deliverable — track it in full,
+# overriding the build-artifact filters above (.clz/.ush/.lpz/.sig/...).
+!Simpl program/
+!Simpl program/**

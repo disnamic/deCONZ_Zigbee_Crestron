@@ -1,0 +1,153 @@
+/*
+  DeConz_Device_Wrapper_v4.0.usp
+  SIMPL+ Wrapper for DeConzDevice (SIMPL# class)
+
+  Raw JSON passthrough for one primary and up to 5 optional additional
+  Zigbee endpoints. Each UID gets its own STRING_OUTPUT.
+
+  Use this module when:
+  - A single physical device exposes multiple deCONZ endpoints (different UIDs)
+  - You want raw JSON from several devices in one SIMPL module
+  - You need a generic catch-all before building a dedicated typed module
+
+  OUTPUTS
+    raw_json_out      payload from Device_UniqueID   (primary, always active)
+    raw_json_all      all payloads from all active UIDs combined
+    raw_json_out_2    payload from UniqueID_2         (active if parameter set)
+    raw_json_out_3    payload from UniqueID_3
+    raw_json_out_4    payload from UniqueID_4
+    raw_json_out_5    payload from UniqueID_5
+    raw_json_out_6    payload from UniqueID_6
+
+  PARAMETERS
+    Device_UniqueID   Primary uniqueid (required)
+    UniqueID_2 … 6   Additional uniqueids (optional – leave empty to disable)
+
+  Programmer : martin@disnamic.com
+*/
+
+#SYMBOL_NAME "DeConz_Device v4.0"
+#CATEGORY "46" "DeConZ_Zigbee"
+
+#DEFAULT_VOLATILE
+#ENABLE_STACK_CHECKING
+#ENABLE_TRACE
+
+#HELP_BEGIN
+  DeConz Device v4.0
+  ----------------------
+  Raw JSON passthrough. One primary + up to 5 optional additional UniqueIDs.
+  Each active UID delivers payloads on its own raw_json_out_N output.
+
+  Leave UniqueID_2 … UniqueID_6 empty to disable those slots.
+
+  Find the uniqueid in Phoscon App:
+    http://<gateway-ip>/pwa/ → Lights / Sensors → device → Advanced
+#HELP_END
+
+#USER_SIMPLSHARP_LIBRARY "DeConzZigbee"
+
+/*****
+  I/O Declarations
+*/
+DIGITAL_INPUT  _SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,
+               Enable_Raw_Json;
+
+STRING_OUTPUT  raw_json_out,
+               raw_json_out_2,
+               raw_json_out_3,
+               raw_json_out_4,
+               raw_json_out_5,
+               raw_json_out_6,
+               raw_json_all;
+
+/*****
+  Parameters
+*/
+STRING_PARAMETER  Device_UniqueID[64],
+                  UniqueID_2[64],
+                  UniqueID_3[64],
+                  UniqueID_4[64],
+                  UniqueID_5[64],
+                  UniqueID_6[64];
+
+#BEGIN_PARAMETER_PROPERTIES Device_UniqueID
+  propValidUnits       = unitString;
+  propDefaultValue     = "00:00:00:00:00:00:00:00-00";
+  propShortDescription = "Primary deCONZ uniqueid (required)";
+#END_PARAMETER_PROPERTIES
+
+#BEGIN_PARAMETER_PROPERTIES UniqueID_2
+  propValidUnits       = unitString;
+  propDefaultValue     = "";
+  propShortDescription = "Additional uniqueid 2 (optional – leave empty to disable)";
+#END_PARAMETER_PROPERTIES
+
+#BEGIN_PARAMETER_PROPERTIES UniqueID_3
+  propValidUnits       = unitString;
+  propDefaultValue     = "";
+  propShortDescription = "Additional uniqueid 3 (optional – leave empty to disable)";
+#END_PARAMETER_PROPERTIES
+
+#BEGIN_PARAMETER_PROPERTIES UniqueID_4
+  propValidUnits       = unitString;
+  propDefaultValue     = "";
+  propShortDescription = "Additional uniqueid 4 (optional – leave empty to disable)";
+#END_PARAMETER_PROPERTIES
+
+#BEGIN_PARAMETER_PROPERTIES UniqueID_5
+  propValidUnits       = unitString;
+  propDefaultValue     = "";
+  propShortDescription = "Additional uniqueid 5 (optional – leave empty to disable)";
+#END_PARAMETER_PROPERTIES
+
+#BEGIN_PARAMETER_PROPERTIES UniqueID_6
+  propValidUnits       = unitString;
+  propDefaultValue     = "";
+  propShortDescription = "Additional uniqueid 6 (optional – leave empty to disable)";
+#END_PARAMETER_PROPERTIES
+
+/*****
+  SIMPL# Object
+*/
+DeConzDevice myDevice;
+
+/*****
+  Delegate Callbacks
+*/
+CALLBACK FUNCTION CB_RawJson(STRING s)   { raw_json_out   = s; }
+CALLBACK FUNCTION CB_RawJsonAll(STRING s) { raw_json_all   = s; }
+CALLBACK FUNCTION CB_RawJson2(STRING s) { raw_json_out_2 = s; }
+CALLBACK FUNCTION CB_RawJson3(STRING s) { raw_json_out_3 = s; }
+CALLBACK FUNCTION CB_RawJson4(STRING s) { raw_json_out_4 = s; }
+CALLBACK FUNCTION CB_RawJson5(STRING s) { raw_json_out_5 = s; }
+CALLBACK FUNCTION CB_RawJson6(STRING s) { raw_json_out_6 = s; }
+
+/*****
+  Main
+*/
+CHANGE Enable_Raw_Json { myDevice.SetRawJsonEnabled(Enable_Raw_Json); }
+
+Function Main()
+{
+  WaitForInitializationComplete();
+
+  RegisterDelegate(myDevice, OnRawJson,    CB_RawJson);
+  RegisterDelegate(myDevice, OnRawJsonAll, CB_RawJsonAll);
+  RegisterDelegate(myDevice, OnRawJson2, CB_RawJson2);
+  RegisterDelegate(myDevice, OnRawJson3, CB_RawJson3);
+  RegisterDelegate(myDevice, OnRawJson4, CB_RawJson4);
+  RegisterDelegate(myDevice, OnRawJson5, CB_RawJson5);
+  RegisterDelegate(myDevice, OnRawJson6, CB_RawJson6);
+
+  // Register optional UIDs before Initialize.
+  // AddUniqueId silently ignores empty strings.
+  myDevice.AddUniqueId(2, UniqueID_2);
+  myDevice.AddUniqueId(3, UniqueID_3);
+  myDevice.AddUniqueId(4, UniqueID_4);
+  myDevice.AddUniqueId(5, UniqueID_5);
+  myDevice.AddUniqueId(6, UniqueID_6);
+
+  myDevice.SetRawJsonEnabled(Enable_Raw_Json);
+  myDevice.Initialize(Device_UniqueID);
+}
