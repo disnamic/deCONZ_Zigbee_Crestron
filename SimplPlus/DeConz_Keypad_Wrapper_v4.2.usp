@@ -62,11 +62,27 @@
 
 #HELP_BEGIN
   DeConz Keypad v4.2
-  --------------------
-  Zigbee remote / keypad (1-10 buttons), optional scroll-wheel / dial
-  (ZHARelativeRotary) via Rotary_UniqueID.
-  State polled on WS connect and every 30 minutes automatically.
-  Pulse Get_State for an immediate refresh.
+  ------------------------------------------------------------------
+  Zigbee keypad / remote (1-10 buttons) with an optional scroll-wheel /
+  dial (ZHARelativeRotary). Feedback via the broker (no wiring). The API
+  key is set centrally on the Gateway.
+
+  PARAMETERS
+    Device_UniqueID         ZHASwitch uniqueid (buttons / wheel click)
+    Rotary_UniqueID         optional ZHARelativeRotary uniqueid (scroll/dial)
+    Number_of_Buttons       1-10
+    Online_Timeout_Seconds  default 120
+    Full_Scale_Seconds      seconds of continuous turning for Level_fb 0-100%
+  INPUTS   Get_State; Set_Level (0-65535 = 0-100% preset for Level_fb);
+           Enable_Debug/Raw_Json/Perm_Resend
+  OUTPUTS  online, Battery_low, Battery_state; Button_{short_release|hold|
+           long_release|double_press|triple_press}_fb[1..N] (500 ms pulse;
+           buttonevent 002/001/003/004/005); Rotate_cw / Rotate_ccw (pulse);
+           Rotation_fb (raw signed), Rotary_event_fb, Rotation_duration_fb;
+           Level_fb (0-65535 dial level); device info, raw_json_out, Debug$
+  NOTES    The dial reports a fixed rate (~1 event/s); Level_fb ramps over time
+           while turning and stops on release. Wire the device's level into
+           Set_Level so the dial tracks reality. Button events fire from WS only.
 #HELP_END
 
 #USER_SIMPLSHARP_LIBRARY "DeConzZigbee"

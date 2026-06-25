@@ -38,11 +38,18 @@
 
 #HELP_BEGIN
   DeConz Alarm v4.1
-  ------------------
-  Alarm, fire and CO sensor module. All endpoints are optional.
-  Use one, two or all three sensor types in a single symbol instance.
-  Combination detectors (smoke+CO) can use all three UIDs simultaneously.
-  tampered_fb fires when any active sensor reports tamper state.
+  ------------------------------------------------------------------
+  Alarm / fire / CO safety sensors: ZHAAlarm + ZHAFire +
+  ZHACarbonMonoxide as three optional endpoints (combine as needed).
+  The API key is set centrally on the Gateway.
+
+  PARAMETERS
+    Alarm_UniqueID / Fire_UniqueID / CO_UniqueID / Battery_UniqueID (all opt.)
+    Online_Timeout_Seconds  default 120
+  INPUTS   Get_State; Enable_Raw_Json/Debug/Perm_Resend
+  OUTPUTS  online, alarm_fb, fire_fb, carbonmonoxide_fb, tampered_fb, battery_low;
+           Battery_state, Voltage_fb; device info; raws, Debug$
+  NOTES    tampered_fb and battery are shared across the active endpoints.
 #HELP_END
 
 #USER_SIMPLSHARP_LIBRARY "DeConzZigbee"

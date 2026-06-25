@@ -57,18 +57,20 @@
 
 #HELP_BEGIN
   DeConz Shade v4.1
-  -------------------
-  Zigbee window covering control + feedback.
+  ------------------------------------------------------------------
+  Window covering (shade / blind / drape). Commands via HTTP PUT,
+  feedback via WebSocket. The API key is set centrally on the Gateway.
 
-  Move_up / Move_down / Stop for basic control, Lift_percentage for absolute
-  position, Tilt_percentage for lamella angle on venetian blinds.
-
-  Lift convention is deCONZ-native (0 open / 100 closed). Set Invert_Lift = 1
-  to mirror both lift command and feedback.
-
-  GetState fires automatically on connect/reconnect (random 1-15 s delay).
-  moving_fb is heuristic: set on a command, cleared when the reported lift
-  reaches the commanded target or after a short timeout.
+  PARAMETERS
+    Device_UniqueID, Battery_UniqueID (opt), Invert_Lift (0/1),
+    Open_Threshold (default 1), Closed_Threshold (default 99),
+    Online_Timeout_Seconds
+  INPUTS   Move_up, Move_down, Stop, Get_State, Enable_Debug/Raw_Json/Perm_Resend;
+           Lift_percentage (0-100), Tilt_percentage (0-100, venetian)
+  OUTPUTS  online, lowbattery_fb, open_fb, closed_fb, moving_fb; Battery_state,
+           Lift_percentage_fb, Tilt_percentage_fb; device info, raw_json_out, Debug$
+  NOTES    deCONZ lift is 0=open / 100=closed; set Invert_Lift=1 to mirror command
+           and feedback. moving_fb is heuristic. GetState on connect (1-15 s).
 #HELP_END
 
 #USER_SIMPLSHARP_LIBRARY "DeConzZigbee"

@@ -59,17 +59,20 @@
 
 #HELP_BEGIN
   DeConz Climate v4.1
-  ---------------------
-  Reads ZHATemperature, ZHAHumidity and ZHAPressure sensor endpoints.
-  Each endpoint has its own UniqueID parameter. All except Temperature
-  are optional – leave empty to disable that endpoint.
+  ------------------------------------------------------------------
+  Environment sensor suite: ZHATemperature + ZHAHumidity + ZHAPressure
+  (all but Temperature optional) plus an optional ZHABattery. The API key
+  is set centrally on the Gateway.
 
-  Temperature: e.g. 2150 = 21.50 C  → Temperature_str = "21.5"
-  Humidity:    e.g. 4532 = 45.32%   → Humidity_str    = "45.3"
-  Pressure:    e.g. 1013 hPa        → Pressure_str    = "1013"
-
-  State is fetched automatically on connect/reconnect with a random
-  1-15 s delay to avoid all modules hitting the gateway simultaneously.
+  PARAMETERS
+    Temperature_UniqueID (required) / Humidity_UniqueID / Pressure_UniqueID /
+    Battery_UniqueID  (all optional); Online_Timeout_Seconds (default 120)
+  INPUTS   Get_State; Enable_Debug/Raw_Json/Perm_Resend
+  OUTPUTS  online, battery_low; Temperature_fb (1/100 C, SIGNED), Humidity_fb
+           (1/100 %), Pressure_fb (hPa), Battery_state, Voltage_fb;
+           Temperature/Humidity/Pressure_str; device info; raws, Debug$
+  NOTES    Temperature_fb is signed 16-bit (65036 = -5.0 C); the _str outputs
+           are always correct. State fetched on connect/reconnect (1-15 s).
 #HELP_END
 
 #USER_SIMPLSHARP_LIBRARY "DeConzZigbee"

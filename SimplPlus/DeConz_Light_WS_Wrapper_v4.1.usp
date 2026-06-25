@@ -51,10 +51,19 @@
 
 #HELP_BEGIN
   DeConz Light WS v4.1
-  ----------------------
-  Commands via HTTP PUT, feedback via WebSocket.
-  Device info (groups, manufacturer, model etc.) populated on HTTP GET.
-  GetState fires automatically on connect/reconnect (random 1-15 s delay).
+  ------------------------------------------------------------------
+  Light control: commands via HTTP PUT, live feedback via WebSocket. The
+  device id/resource are auto-resolved from the first WS event. The API
+  key is set centrally on the Gateway.
+
+  PARAMETERS  Device_UniqueID, Online_Timeout_Seconds
+  INPUTS   Set_On/Set_Off, Get_State, SET_RGB; Brightness/Colortemp/Hue/Sat_In,
+           R/G/B_In, X/Y_Coordinate, Effect_In; Enable_Debug/Raw_Json/Perm_Resend
+  OUTPUTS  online, On_fb/Off_fb, hascolor_fb; Brightness/Colortemp/Hue/Sat/R/G/B_fb;
+           X/Y/Colormode/Effect_fb; Groups_fb; device info (Manufacturer/ModelId/
+           Name/SwVersion/Type/LastSeen/LastAnnounced); device_id_fb, raw_json_out, Debug$
+  NOTES    Colortemp is entered in Kelvin (converted to mired). GetState fires
+           on connect/reconnect (random 1-15 s).
 #HELP_END
 
 #USER_SIMPLSHARP_LIBRARY "DeConzZigbee"

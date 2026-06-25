@@ -51,11 +51,18 @@
 
 #HELP_BEGIN
   DeConz Motion v4.1
-  -------------------
-  Presence + light level sensor. Both endpoints are optional.
-  Duration_In: seconds until presence resets to false after last detection.
-  Thold_Dark / Thold_Offset: lightlevel thresholds for dark_fb and daylight_fb.
-  Pulse the inputs to send the config value to the sensor immediately.
+  ------------------------------------------------------------------
+  Presence + light-level sensor (ZHAPresence + ZHALightLevel), both
+  endpoints optional. The API key is set centrally on the Gateway.
+
+  PARAMETERS
+    Presence_UniqueID / LightLevel_UniqueID / Battery_UniqueID  (all optional)
+    Online_Timeout_Seconds  default 120
+  INPUTS   Duration_In (presence reset s), Thold_Dark / Thold_Offset (lightlevel
+           thresholds; pulse to send); Get_State; Enable_Debug/Raw_Json/Perm_Resend
+  OUTPUTS  online, presence_fb, tampered_fb, dark_fb, daylight_fb, battery_low;
+           Lux_fb, Lightlevel_fb, Battery_state, Voltage_fb; device info; raws, Debug$
+  NOTES    State fetched on connect/reconnect (random 1-15 s); no background poll.
 #HELP_END
 
 #USER_SIMPLSHARP_LIBRARY "DeConzZigbee"

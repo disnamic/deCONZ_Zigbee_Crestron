@@ -76,16 +76,21 @@
 
 #HELP_BEGIN
   DeConz Group Control v4.1
-  ---------------------------
-  Controls 1-4 deCONZ light groups simultaneously.
-  Set Group_ID at runtime (analog input). Optional Group_ID_2/3/4 for
-  broadcasting the same command to multiple groups (0 = disabled).
+  ------------------------------------------------------------------
+  Controls 1-4 deCONZ light groups at once via HTTP, plus group create /
+  rename / members / delete and scene listing. Groups are set at runtime;
+  this module has no parameters. The API key is set centrally on the Gateway.
 
-  Transitiontime: fade duration in 1/10 seconds. Set before issuing a
-  brightness or color command. 0 = immediate.
-
-  State feedback (all_on_fb, any_on_fb, Brightness_fb etc.) is read from
-  the primary group only (Group_ID). Pulse Get_State to refresh.
+  PARAMETERS  none (Group_ID/_2/_3/_4 are analog inputs; 0 = disabled)
+  INPUTS   Set_On/Off, Toggle, Get_State, Delete/Create_Group, Set_Name,
+           Set_Members, Get_All_Groups, Alert_*, Effect_*, Enable_Raw_Json/Debug/
+           Perm_Resend; Group_ID(_2-4), Brightness, Colortemp (K), Hue, Sat,
+           Transitiontime (1/10 s); New_Group_Name, Members_In
+  OUTPUTS  all_on_fb, any_on_fb, Delete/Create/Set_Attr_success_fb, New_Group_Id_fb;
+           Brightness_fb, Colortemp_fb (K); Colormode_fb, group_name_fb, members_fb,
+           scenes_fb, raw_json_out, Debug$
+  NOTES    State feedback is read from the primary group (Group_ID) only.
+           Transitiontime applies to the next brightness/colour command.
 #HELP_END
 
 #USER_SIMPLSHARP_LIBRARY "DeConzZigbee"
