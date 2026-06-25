@@ -27,6 +27,7 @@ namespace DeConzZigbee
         public const int ShortRelease = 2;
         public const int LongRelease  = 3;
         public const int DoublePress  = 4;
+        public const int TreblePress  = 5;
     }
 
     public delegate void KeypadBoolDelegate(ushort value);
@@ -49,6 +50,14 @@ namespace DeConzZigbee
         public KeypadButtonDelegate OnHold         { get; set; }
         public KeypadButtonDelegate OnLongRelease  { get; set; }
         public KeypadButtonDelegate OnDoublePress  { get; set; }
+        public KeypadButtonDelegate OnTreblePress  { get; set; }
+
+        // Rotary (ZHARelativeRotary) — optional second endpoint
+        public KeypadLevelDelegate  OnRotationFb         { get; set; }   // expectedrotation (signed)
+        public KeypadBoolDelegate   OnRotateCw           { get; set; }   // expectedrotation > 0
+        public KeypadBoolDelegate   OnRotateCcw          { get; set; }   // expectedrotation < 0
+        public KeypadLevelDelegate  OnRotaryEventFb      { get; set; }   // rotaryevent
+        public KeypadLevelDelegate  OnRotationDurationFb { get; set; }   // expectedeventduration (ms)
         public KeypadRawJsonDelegate OnRawJson     { get; set; }
         public KeypadDebugDelegate  OnDebugOut     { get; set; }
 
@@ -63,6 +72,7 @@ namespace DeConzZigbee
 
         // ── Private state ─────────────────────────────────────────────────
         private string _uniqueId;
+        private string _rotaryUid;
         private string _apiKey { get { return DeConzBroker.ApiKey ?? ""; } }
         private string _deviceId;    // resolved from first WS frame
         private string _resource;    // resolved from first WS frame
@@ -93,7 +103,7 @@ namespace DeConzZigbee
         /// <summary>
         /// Call from SIMPL+ Main() after all RegisterDelegate calls.
         /// </summary>
-        public void Initialize(string uniqueId,
+        public void Initialize(string uniqueId, string rotaryUniqueId,
                                int numberOfButtons, int onlineTimeoutSeconds)
         {
             if (string.IsNullOrEmpty(uniqueId))
@@ -112,6 +122,13 @@ namespace DeConzZigbee
 
             DeConzBroker.RegisterDevice(_uniqueId, OnWsUpdate);
             DeConzBroker.RegisterConnectedCallback(_uniqueId, ScheduleGetState);
+
+            if (!string.IsNullOrEmpty(rotaryUniqueId))
+            {
+                _rotaryUid = rotaryUniqueId.Trim().ToLowerInvariant();
+                DeConzBroker.RegisterDevice(_rotaryUid, OnRotaryWs);
+                DebugLog("[Keypad] Rotary endpoint registered uid=" + _rotaryUid);
+            }
 
             // 30-minute polling timer (starts after first connect)
             _pollTimer = new CTimer(_ => GetState(), null, PollIntervalMs, PollIntervalMs);
@@ -135,6 +152,7 @@ namespace DeConzZigbee
             if (!_initialized) return;
             DeConzBroker.UnregisterDevice(_uniqueId, OnWsUpdate);
             DeConzBroker.UnregisterConnectedCallback(_uniqueId);
+            if (!string.IsNullOrEmpty(_rotaryUid)) DeConzBroker.UnregisterDevice(_rotaryUid, OnRotaryWs);
             StopOnlineTimer();
             if (_pollTimer != null) { _pollTimer.Stop(); _pollTimer = null; }
             _initialized = false;
@@ -276,6 +294,46 @@ namespace DeConzZigbee
             ParseDeviceInfo(json);    // lastseen, name, etc. from attr events
         }
 
+        // ── Rotary WS callback (ZHARelativeRotary, optional endpoint) ──────
+        private void OnRotaryWs(string json)
+        {
+            if (_debugEnabled) DebugLog("[Keypad rotary:" + _rotaryUid + "] WS: " + json);
+            SetOnline(1);
+            RestartOnlineTimer();
+            FireRawJson(json);
+            ParseRotaryEvent(json);   // rotary events – WS only (transient)
+        }
+
+        /// <summary>
+        /// Parses the relative rotary state (expectedrotation / rotaryevent /
+        /// expectedeventduration). expectedrotation is signed: positive = CW,
+        /// negative = CCW (read as signed in SIMPL+). Called ONLY from WS events
+        /// (transient, like buttonevent), never from an HTTP GET.
+        /// </summary>
+        private void ParseRotaryEvent(string json)
+        {
+            try
+            {
+                int? rot = DeConzJsonParser.ExtractInt(json, "expectedrotation", 2);
+                if (rot.HasValue)
+                {
+                    Fire(OnRotationFb, (ushort)rot.Value);   // signed (two's complement)
+                    if      (rot.Value > 0) Fire(OnRotateCw, 1);
+                    else if (rot.Value < 0) Fire(OnRotateCcw, 1);
+                }
+                int? ev = DeConzJsonParser.ExtractInt(json, "rotaryevent", 2);
+                if (ev.HasValue) Fire(OnRotaryEventFb, (ushort)Math.Max(0, Math.Min(65535, ev.Value)));
+                int? dur = DeConzJsonParser.ExtractInt(json, "expectedeventduration", 2);
+                if (dur.HasValue) Fire(OnRotationDurationFb, (ushort)Math.Max(0, Math.Min(65535, dur.Value)));
+                DebugLog(string.Format("[Keypad rotary:{0}] rotation={1} event={2} duration={3}",
+                    _rotaryUid, rot, ev, dur));
+            }
+            catch (Exception ex)
+            {
+                CrestronConsole.PrintLine("[Keypad rotary] ParseRotaryEvent error: " + ex.Message);
+            }
+        }
+
         // ── JSON parser ───────────────────────────────────────────────────
 
         /// <summary>
@@ -335,6 +393,7 @@ namespace DeConzZigbee
                         case ButtonEvent.ShortRelease: FireButton(OnShortRelease, btn); break;
                         case ButtonEvent.LongRelease:  FireButton(OnLongRelease, btn);  break;
                         case ButtonEvent.DoublePress:  FireButton(OnDoublePress, btn);  break;
+                        case ButtonEvent.TreblePress:  FireButton(OnTreblePress, btn);  break;
                         default:
                             DebugLog("[Keypad:" + _uniqueId + "] Unknown event code: " + eventCode);
                             break;
@@ -371,6 +430,9 @@ namespace DeConzZigbee
             Fire(OnOnline, 0);
             Fire(OnBatteryLow, 0);
             Fire(OnBatteryLevel, 0);
+            Fire(OnRotationFb, 0);
+            Fire(OnRotaryEventFb, 0);
+            Fire(OnRotationDurationFb, 0);
         }
 
         private void RestartOnlineTimer()

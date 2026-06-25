@@ -1,5 +1,5 @@
 /*
-  DeConz_Keypad_Wrapper_v4.1.usp
+  DeConz_Keypad_Wrapper_v4.2.usp
   SIMPL+ Wrapper for DeConzKeypad (SIMPL# class)
 
   Zigbee keypad / remote receiver.
@@ -17,9 +17,14 @@
     Button_hold_fb[1..N]            500 ms pulse
     Button_long_release_fb[1..N]    500 ms pulse
     Button_double_press_fb[1..N]    500 ms pulse
+    Button_triple_press_fb[1..N]    500 ms pulse (buttonevent 005)
+    Rotate_cw / Rotate_ccw          500 ms pulse on dial rotation (rotary endpoint)
 
   ANALOG OUTPUTS
     Battery_state           0-100 %
+    Rotation_fb             expectedrotation, SIGNED (+ = CW, - = CCW)
+    Rotary_event_fb         rotaryevent
+    Rotation_duration_fb    expectedeventduration (ms)
 
   STRING OUTPUTS
     LastAnnounced_fb        ISO timestamp
@@ -33,14 +38,15 @@
     Debug$
 
   PARAMETERS
-    Device_UniqueID         Zigbee uniqueid
+    Device_UniqueID         Zigbee uniqueid (ZHASwitch endpoint)
+    Rotary_UniqueID         Optional ZHARelativeRotary endpoint (scroll/dial)
     Number_of_Buttons       1-10
     Online_Timeout_Seconds  Default 120
 
   Programmer : martin@disnamic.com
 */
 
-#SYMBOL_NAME "DeConz_Keypad v4.1"
+#SYMBOL_NAME "DeConz_Keypad v4.2"
 #CATEGORY "46" "DeConZ_Zigbee"
 
 #DEFINE_CONSTANT MAXBUTTONS 10
@@ -50,38 +56,46 @@
 #ENABLE_TRACE
 
 #HELP_BEGIN
-  DeConz Keypad v4.1
+  DeConz Keypad v4.2
   --------------------
-  Zigbee remote / keypad (1-10 buttons).
+  Zigbee remote / keypad (1-10 buttons), optional scroll-wheel / dial
+  (ZHARelativeRotary) via Rotary_UniqueID.
   State polled on WS connect and every 30 minutes automatically.
   Pulse Get_State for an immediate refresh.
 #HELP_END
 
 #USER_SIMPLSHARP_LIBRARY "DeConzZigbee"
 
-DIGITAL_INPUT  _SKIP_, _SKIP_, _SKIP_, Get_State, Enable_Debug, Enable_Raw_Json, Permanent_Resend_Enable;
+DIGITAL_INPUT  _SKIP_, _SKIP_, _SKIP_, _SKIP_, Get_State, Enable_Debug, Enable_Raw_Json, Permanent_Resend_Enable;
 
-DIGITAL_OUTPUT _SKIP_,_SKIP_,_SKIP_, online, Battery_low;
+DIGITAL_OUTPUT _SKIP_,_SKIP_,_SKIP_,_SKIP_, online, Battery_low, _SKIP_, Rotate_cw, Rotate_ccw;
 DIGITAL_OUTPUT Button_short_release_fb[MAXBUTTONS];
 DIGITAL_OUTPUT _SKIP_,Button_hold_fb[MAXBUTTONS];
 DIGITAL_OUTPUT _SKIP_,Button_long_release_fb[MAXBUTTONS];
 DIGITAL_OUTPUT _SKIP_,Button_double_press_fb[MAXBUTTONS];
+DIGITAL_OUTPUT _SKIP_,Button_triple_press_fb[MAXBUTTONS];
 
-ANALOG_OUTPUT  Battery_state;
+ANALOG_OUTPUT  Battery_state, _SKIP_, Rotation_fb, Rotary_event_fb, Rotation_duration_fb;
 
 STRING_OUTPUT  LastAnnounced_fb, LastSeen_fb,
                Manufacturer_fb, ModelId_fb, Name_fb,
                SwVersion_fb, Type_fb,_SKIP_,
                raw_json_out, Debug$;
 
-STRING_PARAMETER  Device_UniqueID[64];
+STRING_PARAMETER  Device_UniqueID[64], Rotary_UniqueID[64];
 INTEGER_PARAMETER Number_of_Buttons, Online_Timeout_Seconds;
 
 
 #BEGIN_PARAMETER_PROPERTIES Device_UniqueID
   propValidUnits       = unitString;
   propDefaultValue     = "00:00:00:00:00:00:00:00-00";
-  propShortDescription = "Zigbee uniqueid (Phoscon App → Sensors → device → Advanced)";
+  propShortDescription = "Zigbee uniqueid, ZHASwitch endpoint (Phoscon → Sensors → Advanced)";
+#END_PARAMETER_PROPERTIES
+
+#BEGIN_PARAMETER_PROPERTIES Rotary_UniqueID
+  propValidUnits       = unitString;
+  propDefaultValue     = "";
+  propShortDescription = "Optional ZHARelativeRotary uniqueid (scroll/dial); empty if none";
 #END_PARAMETER_PROPERTIES
 
 #BEGIN_PARAMETER_PROPERTIES Number_of_Buttons
@@ -129,6 +143,17 @@ CALLBACK FUNCTION CB_DoublePress(INTEGER btnNum)
   IF (btnNum >= 1 && btnNum <= MAXBUTTONS)
     PULSE(50, Button_double_press_fb[btnNum]);
 }
+CALLBACK FUNCTION CB_TreblePress(INTEGER btnNum)
+{
+  IF (btnNum >= 1 && btnNum <= MAXBUTTONS)
+    PULSE(50, Button_triple_press_fb[btnNum]);
+}
+
+CALLBACK FUNCTION CB_RotateCw(INTEGER v)            { PULSE(50, Rotate_cw);  }
+CALLBACK FUNCTION CB_RotateCcw(INTEGER v)           { PULSE(50, Rotate_ccw); }
+CALLBACK FUNCTION CB_RotationFb(INTEGER v)          { Rotation_fb          = v; }
+CALLBACK FUNCTION CB_RotaryEventFb(INTEGER v)       { Rotary_event_fb      = v; }
+CALLBACK FUNCTION CB_RotationDurationFb(INTEGER v)  { Rotation_duration_fb = v; }
 
 CALLBACK FUNCTION CB_RawJson(STRING s) { raw_json_out = s; }
 CALLBACK FUNCTION CB_Debug(STRING s)   { Debug$       = s; }
@@ -156,6 +181,12 @@ Function Main()
   RegisterDelegate(myKeypad, OnHold,         CB_Hold);
   RegisterDelegate(myKeypad, OnLongRelease,  CB_LongRelease);
   RegisterDelegate(myKeypad, OnDoublePress,  CB_DoublePress);
+  RegisterDelegate(myKeypad, OnTreblePress,  CB_TreblePress);
+  RegisterDelegate(myKeypad, OnRotationFb,         CB_RotationFb);
+  RegisterDelegate(myKeypad, OnRotateCw,           CB_RotateCw);
+  RegisterDelegate(myKeypad, OnRotateCcw,          CB_RotateCcw);
+  RegisterDelegate(myKeypad, OnRotaryEventFb,      CB_RotaryEventFb);
+  RegisterDelegate(myKeypad, OnRotationDurationFb, CB_RotationDurationFb);
   RegisterDelegate(myKeypad, OnRawJson,      CB_RawJson);
   RegisterDelegate(myKeypad, OnDebugOut,     CB_Debug);
   RegisterDelegate(myKeypad, OnLastAnnouncedFb, CB_LastAnnounced);
@@ -168,7 +199,7 @@ Function Main()
 
   myKeypad.SetRawJsonEnabled(Enable_Raw_Json);
   myKeypad.SetPermanentResend(Permanent_Resend_Enable);
-  myKeypad.Initialize(Device_UniqueID,
+  myKeypad.Initialize(Device_UniqueID, Rotary_UniqueID,
                       Number_of_Buttons, Online_Timeout_Seconds);
   myKeypad.SetDebug(Enable_Debug);
 }
