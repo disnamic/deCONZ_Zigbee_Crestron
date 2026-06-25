@@ -325,3 +325,11 @@ On the keypad side, the original two-dimensional button-feedback array bug is
 fixed, double-press events are supported, and the online timeout is a parameter
 rather than hardcoded. Throughout, work runs on `CrestronInvoke` worker threads
 rather than the SIMPL+ event loop.
+
+---
+
+## Disclaimer
+
+This programming is not created by Crestron Electronics.
+This programming is not supported by Crestron Electronics' support team.
+Crestron Electronics is not liable for any damage caused by this programming.
