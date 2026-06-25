@@ -4,7 +4,7 @@
 ================================================================================
 
 --------------------------------------------------------------------------------
-Version 4.1.0  (2026-06-24)
+Version 4.1.0  (2026-06-25)
 --------------------------------------------------------------------------------
 Feature release. Adds the missing LastAnnounced output to the last three modules,
 makes Get_State re-send static device info, and introduces a global/local

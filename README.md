@@ -1,6 +1,6 @@
-# DeConz Zigbee – Crestron SIMPL# Module Suite v4.0
+# DeConz Zigbee – Crestron SIMPL# Module Suite v4.1
 
-**Latest release: 4.0.** Contact: martin@disnamic.com
+**Latest release: 4.1.** Contact: martin@disnamic.com
 
 A SIMPL# module suite for controlling and monitoring Zigbee devices through a
 deCONZ gateway (dresden elektronik / Phoscon). Commands are sent over the
@@ -36,10 +36,11 @@ A device module registers on start-up with its uniqueid and a callback:
 
     DeConzBroker.RegisterDevice(uniqueid, myCallback);
 
-The gateway sets the IP once on initialize, and device modules read it directly
-when building HTTP request URLs:
+The gateway sets the IP and the deCONZ API key once on initialize, and device
+modules read both directly when building HTTP request URLs:
 
     DeConzBroker.GatewayIP = ipAddress;
+    DeConzBroker.ApiKey    = apiKey;
 
 Multiple modules may register the same uniqueid. The broker is multicast: every
 registered callback for a uniqueid receives each payload. This lets a generic
@@ -104,10 +105,21 @@ Each device module has a matching `DeConz_*_Wrapper` SIMPL+ symbol.
 
 Several conventions are shared across all modules.
 
-Every module that talks to the REST API takes an `API_Key` parameter (the
-deCONZ API key) and identifies its device by a Zigbee `uniqueid` parameter.
-The gateway IP is never wired or configured per module — it comes from the
-broker.
+The deCONZ API key is entered **once on the gateway** (its `API_Key` parameter)
+and distributed to every device module through the broker — device modules no
+longer take a per-module API key. Each device identifies itself by a Zigbee
+`uniqueid` parameter. Both the gateway IP and the API key are never wired or
+configured per module; they come from the broker.
+
+Every device module that exposes static device-info strings has a
+`Permanent_Resend_Enable` digital input. While high (or while the gateway's
+global `Permanent_Resend_Enable` is high) the module periodically re-fires its
+cached non-raw string outputs, so late-joining sinks — a reconnecting panel, a
+program restart — always see the current values. The interval is the gateway's
+`Permanent_Resend_Seconds` parameter (default 30). The gateway enable overrides
+the local enables only while it is high; while it is low, each module's local
+enable applies. A `Get_State` pulse additionally re-sends the once-only static
+device info (manufacturer, model, name).
 
 Most sensor modules expose an `Online_Timeout_Seconds` parameter (default 120).
 The `online` output goes high on any WebSocket activity and falls back to low if
@@ -138,12 +150,14 @@ output for logic and a formatted string output for display.
 
 ### DeConz_Gateway (one per program)
 
-Owns the WebSocket connection. Inputs let you enable or disable the connection
-and toggle debug output. Outputs report whether WebSocket traffic is present,
-the TCP socket status, the gateway IP for optional external use, and debug text.
+Owns the WebSocket connection. Inputs let you enable or disable the connection,
+toggle debug output, and globally enable the permanent string re-assert for all
+device modules. Outputs report whether WebSocket traffic is present, the TCP
+socket status, the gateway IP for optional external use, and debug text.
 Parameters are the IP address or hostname, the port (80 for ws, 443 for wss),
-an alive timeout in seconds for the traffic indicator, and a TLS flag selecting
-ws:// or wss://.
+an alive timeout in seconds for the traffic indicator, a TLS flag selecting
+ws:// or wss://, the central `API_Key` distributed to all device modules, and
+`Permanent_Resend_Seconds` (the re-assert interval, default 30).
 
 ### DeConz_Device (generic)
 
@@ -272,7 +286,9 @@ To find the values needed for the parameters, use the Phoscon app at
 `http://<gateway-ip>/pwa/`:
 
 - uniqueid: open Lights or Sensors, select the device, view its Advanced details
-- API key: Settings, Gateway, Advanced, then create or read the API key
+- API key: Settings, Gateway, Advanced, then create or read the API key — enter
+  it once on the gateway module's `API_Key` parameter; device modules need only
+  their uniqueids
 - group and scene IDs: visible in the Phoscon group and scene configuration
 
 ---
