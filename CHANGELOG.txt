@@ -4,6 +4,41 @@
 ================================================================================
 
 --------------------------------------------------------------------------------
+Version 4.2.0  (2026-06-25)
+--------------------------------------------------------------------------------
+Feature release — Keypad module only. Adds triple/treble press and an optional
+relative-rotary (scroll-wheel / dial) endpoint. Only the Keypad symbol moves to
+the v4.2 generation; the other 13 modules are unchanged and stay v4.1 (their
+symbols remain compatible with the 4.2.0.0 library).
+
+Keypad — triple/treble press (buttonevent 005):
+  - New DIGITAL_OUTPUT Button_triple_press_fb[1..N] (500 ms pulse) for deCONZ
+    buttonevent code 005 (e.g. the IKEA BILRESA / E2490 wheel click). The
+    ButtonEvent map gains TreblePress = 5.
+
+Keypad — optional ZHARelativeRotary endpoint (scroll wheel / dial):
+  - New optional STRING_PARAMETER Rotary_UniqueID. When set, the module also
+    registers that uniqueid with the broker and parses its rotation events
+    (WS only, transient — never re-fired from an HTTP GET).
+  - New outputs: Rotate_cw / Rotate_ccw (500 ms pulses), Rotation_fb
+    (expectedrotation, SIGNED: + = CW, - = CCW; read as signed in SIMPL+),
+    Rotary_event_fb (rotaryevent) and Rotation_duration_fb
+    (expectedeventduration, ms).
+  - One physical scroll-wheel remote (e.g. IKEA BILRESA) is a single symbol:
+    the wheel click is a buttonevent on the ZHASwitch endpoint, the rotation is
+    the separate ZHARelativeRotary endpoint; battery/online/identity are shared.
+
+BREAKING (Keypad symbol only):
+  - Rotary_UniqueID adds a parameter, so the keypad symbol's leading _SKIP_ count
+    and the new outputs shift its signal layout. #SYMBOL_NAME and the .usp
+    filename now carry "v4.2" (DeConz_Keypad v4.2 /
+    DeConz_Keypad_Wrapper_v4.2.usp). Replace the v4.1 keypad symbol with the v4.2
+    one and re-check its connections. The other modules are not affected.
+
+Build:
+  - AssemblyVersion / AssemblyFileVersion 4.2.0.0.
+
+--------------------------------------------------------------------------------
 Version 4.1.1  (2026-06-25)
 --------------------------------------------------------------------------------
 Bugfix release (library only — no wrapper/signal changes).

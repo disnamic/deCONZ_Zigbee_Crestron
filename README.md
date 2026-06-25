@@ -1,6 +1,6 @@
-# DeConz Zigbee – Crestron SIMPL# Module Suite v4.1
+# DeConz Zigbee – Crestron SIMPL# Module Suite v4.2
 
-**Latest release: 4.1.** Contact: martin@disnamic.com
+**Latest release: 4.2.** Contact: martin@disnamic.com
 
 A SIMPL# module suite for controlling and monitoring Zigbee devices through a
 deCONZ gateway (dresden elektronik / Phoscon). Commands are sent over the
@@ -178,11 +178,22 @@ information such as model, manufacturer and group membership.
 ### DeConz_Keypad
 
 For Zigbee keypads and remotes with up to ten buttons. Decodes the deCONZ
-`buttonevent` into per-button pulses for press/hold, short release, long release
-and double press. Reports battery level, low battery and online state, plus
-device information. State is fetched on connect and refreshed every 30 minutes.
-Button events fire only from WebSocket frames, never from a state poll, so a
-state refresh never re-triggers the last button press.
+`buttonevent` into per-button pulses for press/hold, short release, long release,
+double press and triple/treble press (event 005). Reports battery level, low
+battery and online state, plus device information. State is fetched on connect
+and refreshed every 30 minutes. Button events fire only from WebSocket frames,
+never from a state poll, so a state refresh never re-triggers the last button
+press.
+
+An optional scroll-wheel / dial (ZHARelativeRotary) is supported via
+`Rotary_UniqueID`: set it to the device's rotary endpoint and the same symbol
+also reports rotation. Outputs are `Rotate_cw` / `Rotate_ccw` pulses, a signed
+`Rotation_fb` (expectedrotation; + = clockwise, - = counter-clockwise, read as a
+signed analog in SIMPL+), `Rotary_event_fb` and `Rotation_duration_fb` (ms).
+Rotation events are WebSocket-only and transient, like button events. A
+combination device such as the IKEA BILRESA (E2490) is a single symbol: the
+wheel click arrives on the ZHASwitch endpoint, the rotation on the separate
+ZHARelativeRotary endpoint.
 
 ### DeConz_Valve
 
@@ -303,6 +314,7 @@ event code:
     002  short_release
     003  long_release
     004  double_press
+    005  treble_press
 
 For example, 1002 is button 1 short release, 2001 is button 2 hold, 3003 is
 button 3 long release, and 10002 is button 10 short release.
