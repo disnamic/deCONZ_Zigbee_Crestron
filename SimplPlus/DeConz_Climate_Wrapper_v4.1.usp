@@ -60,19 +60,42 @@
 #HELP_BEGIN
   DeConz Climate v4.1
   ------------------------------------------------------------------
-  Environment sensor suite: ZHATemperature + ZHAHumidity + ZHAPressure
-  (all but Temperature optional) plus an optional ZHABattery. The API key
-  is set centrally on the Gateway.
+  Zigbee climate / environment sensor suite. Up to three endpoints:
+    ZHATemperature   temperature in 1/100 C + formatted string
+    ZHAHumidity      humidity in 1/100 % + formatted string
+    ZHAPressure      pressure in hPa + string
+  plus an optional ZHABattery endpoint. All UniqueIDs except Temperature
+  are optional. The API key is set centrally on the Gateway. State is
+  fetched on connect/reconnect (random 1-15 s).
+
+  DIGITAL INPUTS
+    Get_State                Pulse -> HTTP GET all active endpoints
+    Enable_Raw_Json          High  -> raw JSON outputs active
+    Enable_Debug             High  -> debug on Debug$
+    Permanent_Resend_Enable  High  -> periodically re-assert cached strings
+
+  DIGITAL OUTPUTS
+    online                   1 = WS alive
+    battery_low              1 = low battery
+
+  ANALOG OUTPUTS
+    Temperature_fb           raw 1/100 C, SIGNED (2150 = 21.5 C, 65036 = -5.0 C)
+    Humidity_fb              raw 1/100 % (4532 = 45.32%)
+    Pressure_fb              hPa
+    Battery_state            0-100 %
+    Voltage_fb               mV (ZHABattery)
+
+  STRING OUTPUTS
+    Temperature_str "21.5" / Humidity_str "45.3" / Pressure_str "1013"
+    LastSeen_fb / LastAnnounced_fb / Manufacturer_fb / ModelId_fb / Name_fb
+    temp_raw_json / hum_raw_json / pres_raw_json / battery_raw_json / Debug$
 
   PARAMETERS
-    Temperature_UniqueID (required) / Humidity_UniqueID / Pressure_UniqueID /
-    Battery_UniqueID  (all optional); Online_Timeout_Seconds (default 120)
-  INPUTS   Get_State; Enable_Debug/Raw_Json/Perm_Resend
-  OUTPUTS  online, battery_low; Temperature_fb (1/100 C, SIGNED), Humidity_fb
-           (1/100 %), Pressure_fb (hPa), Battery_state, Voltage_fb;
-           Temperature/Humidity/Pressure_str; device info; raws, Debug$
-  NOTES    Temperature_fb is signed 16-bit (65036 = -5.0 C); the _str outputs
-           are always correct. State fetched on connect/reconnect (1-15 s).
+    Temperature_UniqueID     ZHATemperature uniqueid (required)
+    Humidity_UniqueID        ZHAHumidity uniqueid    (optional)
+    Pressure_UniqueID        ZHAPressure uniqueid    (optional)
+    Battery_UniqueID         ZHABattery uniqueid     (optional)
+    Online_Timeout_Seconds   default 120
 #HELP_END
 
 #USER_SIMPLSHARP_LIBRARY "DeConzZigbee"

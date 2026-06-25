@@ -67,22 +67,44 @@
   dial (ZHARelativeRotary). Feedback via the broker (no wiring). The API
   key is set centrally on the Gateway.
 
+  DIGITAL INPUTS
+    Get_State                Pulse -> HTTP GET state refresh
+    Enable_Raw_Json / Enable_Debug / Permanent_Resend_Enable
+
+  ANALOG INPUTS
+    Set_Level                0-65535 (= 0-100%) preset for Level_fb
+
+  DIGITAL OUTPUTS
+    online / Battery_low
+    Button_short_release_fb[1..N]   500 ms pulse  (buttonevent 002)
+    Button_hold_fb[1..N]            500 ms pulse  (001)
+    Button_long_release_fb[1..N]    500 ms pulse  (003)
+    Button_double_press_fb[1..N]    500 ms pulse  (004)
+    Button_triple_press_fb[1..N]    500 ms pulse  (005)
+    Rotate_cw / Rotate_ccw          500 ms pulse per rotation event
+
+  ANALOG OUTPUTS
+    Battery_state            0-100 %
+    Rotation_fb              raw expectedrotation, SIGNED (+ = CW, - = CCW)
+    Rotary_event_fb          rotaryevent
+    Rotation_duration_fb     expectedeventduration (ms)
+    Level_fb                 0-65535 (= 0-100%) time-ramped dial level
+
+  STRING OUTPUTS
+    LastAnnounced_fb / LastSeen_fb / Manufacturer_fb / ModelId_fb / Name_fb /
+    SwVersion_fb / Type_fb / raw_json_out / Debug$
+
   PARAMETERS
-    Device_UniqueID         ZHASwitch uniqueid (buttons / wheel click)
-    Rotary_UniqueID         optional ZHARelativeRotary uniqueid (scroll/dial)
-    Number_of_Buttons       1-10
-    Online_Timeout_Seconds  default 120
-    Full_Scale_Seconds      seconds of continuous turning for Level_fb 0-100%
-  INPUTS   Get_State; Set_Level (0-65535 = 0-100% preset for Level_fb);
-           Enable_Debug/Raw_Json/Perm_Resend
-  OUTPUTS  online, Battery_low, Battery_state; Button_{short_release|hold|
-           long_release|double_press|triple_press}_fb[1..N] (500 ms pulse;
-           buttonevent 002/001/003/004/005); Rotate_cw / Rotate_ccw (pulse);
-           Rotation_fb (raw signed), Rotary_event_fb, Rotation_duration_fb;
-           Level_fb (0-65535 dial level); device info, raw_json_out, Debug$
-  NOTES    The dial reports a fixed rate (~1 event/s); Level_fb ramps over time
-           while turning and stops on release. Wire the device's level into
-           Set_Level so the dial tracks reality. Button events fire from WS only.
+    Device_UniqueID          ZHASwitch uniqueid (buttons / wheel click)
+    Rotary_UniqueID          optional ZHARelativeRotary uniqueid (scroll/dial)
+    Number_of_Buttons        1-10
+    Online_Timeout_Seconds   default 120
+    Full_Scale_Seconds       seconds of continuous turning for Level_fb 0-100%
+
+  NOTES
+    The dial reports a fixed rate (~1 event/s); Level_fb ramps over time
+    while turning and stops on release. Wire the device's level into
+    Set_Level so the dial tracks reality. Button events fire from WS only.
 #HELP_END
 
 #USER_SIMPLSHARP_LIBRARY "DeConzZigbee"

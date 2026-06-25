@@ -52,17 +52,43 @@
 #HELP_BEGIN
   DeConz Motion v4.1
   ------------------------------------------------------------------
-  Presence + light-level sensor (ZHAPresence + ZHALightLevel), both
-  endpoints optional. The API key is set centrally on the Gateway.
+  Presence + light-level sensor: ZHAPresence and ZHALightLevel as two
+  optional endpoints. The API key is set centrally on the Gateway. State
+  is fetched on connect/reconnect (random 1-15 s); no background poll.
+  Sensor/LED/user-test and sensitivity/delay are Philips-specific and are
+  silently ignored by other brands.
+
+  DIGITAL INPUTS
+    Sensor_On / Sensor_Off        enable / disable the sensor
+    Led_On / Led_Off              LED indication on / off
+    User_Test_On / User_Test_Off  user-test mode
+    Get_State                     Pulse -> HTTP GET all active endpoints
+    Enable_Raw_Json / Enable_Debug / Permanent_Resend_Enable
+
+  ANALOG INPUTS
+    Duration_In      presence timeout in seconds (config.duration)
+    Thold_Dark       lightlevel threshold for dark_fb (config.tholddark)
+    Thold_Offset     offset above dark for daylight_fb (config.tholdoffset)
+    Sensitivity_In   sensor sensitivity (Philips)
+    Delay_In         detection delay in ms (Philips)
+
+  DIGITAL OUTPUTS
+    online / presence_fb / tampered_fb / dark_fb / daylight_fb / battery_low
+    sensor_on_fb / led_indication_fb / user_test_fb
+
+  ANALOG OUTPUTS
+    Lux_fb / Lightlevel_fb / Battery_state (0-100%) / Voltage_fb (mV)
+    Sensitivity_fb / Sensitivity_Max_fb / Delay_fb
+
+  STRING OUTPUTS
+    LastSeen_fb / LastAnnounced_fb / Manufacturer_fb / ModelId_fb / Name_fb
+    presence_raw_json / light_raw_json / battery_raw_json / Debug$
 
   PARAMETERS
-    Presence_UniqueID / LightLevel_UniqueID / Battery_UniqueID  (all optional)
-    Online_Timeout_Seconds  default 120
-  INPUTS   Duration_In (presence reset s), Thold_Dark / Thold_Offset (lightlevel
-           thresholds; pulse to send); Get_State; Enable_Debug/Raw_Json/Perm_Resend
-  OUTPUTS  online, presence_fb, tampered_fb, dark_fb, daylight_fb, battery_low;
-           Lux_fb, Lightlevel_fb, Battery_state, Voltage_fb; device info; raws, Debug$
-  NOTES    State fetched on connect/reconnect (random 1-15 s); no background poll.
+    Presence_UniqueID        ZHAPresence uniqueid    (optional)
+    LightLevel_UniqueID      ZHALightLevel uniqueid  (optional)
+    Battery_UniqueID         ZHABattery uniqueid     (optional)
+    Online_Timeout_Seconds   default 120
 #HELP_END
 
 #USER_SIMPLSHARP_LIBRARY "DeConzZigbee"
