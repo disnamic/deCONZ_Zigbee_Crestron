@@ -58,6 +58,7 @@ namespace DeConzZigbee
         public KeypadBoolDelegate   OnRotateCcw          { get; set; }   // expectedrotation < 0
         public KeypadLevelDelegate  OnRotaryEventFb      { get; set; }   // rotaryevent
         public KeypadLevelDelegate  OnRotationDurationFb { get; set; }   // expectedeventduration (ms)
+        public KeypadLevelDelegate  OnLevelFb            { get; set; }   // accumulated level 0-65535 (0-100%)
         public KeypadRawJsonDelegate OnRawJson     { get; set; }
         public KeypadDebugDelegate  OnDebugOut     { get; set; }
 
@@ -73,6 +74,8 @@ namespace DeConzZigbee
         // ── Private state ─────────────────────────────────────────────────
         private string _uniqueId;
         private string _rotaryUid;
+        private int    _fullScaleDeg = 720;   // rotations × 360 = full-scale rotation for 0-100%
+        private double _accumDeg;             // accumulated rotation, clamped [0, _fullScaleDeg]
         private string _apiKey { get { return DeConzBroker.ApiKey ?? ""; } }
         private string _deviceId;    // resolved from first WS frame
         private string _resource;    // resolved from first WS frame
@@ -104,7 +107,8 @@ namespace DeConzZigbee
         /// Call from SIMPL+ Main() after all RegisterDelegate calls.
         /// </summary>
         public void Initialize(string uniqueId, string rotaryUniqueId,
-                               int numberOfButtons, int onlineTimeoutSeconds)
+                               int numberOfButtons, int onlineTimeoutSeconds,
+                               int fullScaleRotations)
         {
             if (string.IsNullOrEmpty(uniqueId))
             {
@@ -115,6 +119,7 @@ namespace DeConzZigbee
             _uniqueId        = uniqueId.Trim().ToLowerInvariant();
             _numberOfButtons = Math.Max(1, Math.Min(MaxButtons, numberOfButtons));
             _onlineTimeoutMs = Math.Max(5000, onlineTimeoutSeconds * 1000);
+            _fullScaleDeg    = Math.Max(1, fullScaleRotations) * 360;
             _initialized     = true;
 
             _http.TimeoutEnabled = true;
@@ -144,6 +149,23 @@ namespace DeConzZigbee
 
         public void SetRawJsonEnabled(ushort enable) { _rawJsonEnabled = (enable != 0); }
         public void SetDebug(ushort enable) { _debugEnabled = (enable != 0); }
+
+        /// <summary>
+        /// Preset the accumulated rotary level (0-65535 = 0-100%) so the dial
+        /// tracks the real device level. Echoes Level_fb with the new value.
+        /// </summary>
+        public void SetLevel(ushort raw)
+        {
+            _accumDeg = (raw / 65535.0) * _fullScaleDeg;
+            FireLevel();
+        }
+
+        private void FireLevel()
+        {
+            double frac = (_fullScaleDeg > 0) ? (_accumDeg / _fullScaleDeg) : 0.0;
+            if (frac < 0) frac = 0; else if (frac > 1) frac = 1;
+            Fire(OnLevelFb, (ushort)Math.Round(frac * 65535.0));
+        }
 
         public void Dispose()
         {
@@ -320,6 +342,10 @@ namespace DeConzZigbee
                     Fire(OnRotationFb, (ushort)rot.Value);   // signed (two's complement)
                     if      (rot.Value > 0) Fire(OnRotateCw, 1);
                     else if (rot.Value < 0) Fire(OnRotateCcw, 1);
+                    _accumDeg += rot.Value;
+                    if      (_accumDeg < 0)             _accumDeg = 0;
+                    else if (_accumDeg > _fullScaleDeg) _accumDeg = _fullScaleDeg;
+                    FireLevel();
                 }
                 int? ev = DeConzJsonParser.ExtractInt(json, "rotaryevent", 2);
                 if (ev.HasValue) Fire(OnRotaryEventFb, (ushort)Math.Max(0, Math.Min(65535, ev.Value)));

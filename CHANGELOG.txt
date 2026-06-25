@@ -28,9 +28,18 @@ Keypad — optional ZHARelativeRotary endpoint (scroll wheel / dial):
     the wheel click is a buttonevent on the ZHASwitch endpoint, the rotation is
     the separate ZHARelativeRotary endpoint; battery/online/identity are shared.
 
+Keypad — accumulated rotary level (volume / dimmer):
+  - New ANALOG_OUTPUT Level_fb (0-65535 = 0-100%): the signed rotation deltas are
+    summed into an absolute level and clamped to 0-100%.
+  - New INTEGER_PARAMETER Full_Scale_Rotations sets how many full turns of the
+    dial span 0-100% (default 2; one turn = 360 degrees).
+  - New ANALOG_INPUT Set_Level (0-65535 = 0-100%) presets the level so the dial
+    tracks the real device value (e.g. wire the device's current volume in).
+
 BREAKING (Keypad symbol only):
-  - Rotary_UniqueID adds a parameter, so the keypad symbol's leading _SKIP_ count
-    and the new outputs shift its signal layout. #SYMBOL_NAME and the .usp
+  - Rotary_UniqueID and Full_Scale_Rotations add parameters, so the keypad
+    symbol's leading _SKIP_ count and the new analog/digital signals shift its
+    layout. #SYMBOL_NAME and the .usp
     filename now carry "v4.2" (DeConz_Keypad v4.2 /
     DeConz_Keypad_Wrapper_v4.2.usp). Replace the v4.1 keypad symbol with the v4.2
     one and re-check its connections. The other modules are not affected.

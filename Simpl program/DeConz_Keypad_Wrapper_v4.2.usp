@@ -20,11 +20,15 @@
     Button_triple_press_fb[1..N]    500 ms pulse (buttonevent 005)
     Rotate_cw / Rotate_ccw          500 ms pulse on dial rotation (rotary endpoint)
 
+  ANALOG INPUTS
+    Set_Level               0-65535 (0-100%) preset of the dial level (Level_fb)
+
   ANALOG OUTPUTS
     Battery_state           0-100 %
     Rotation_fb             expectedrotation, SIGNED (+ = CW, - = CCW)
     Rotary_event_fb         rotaryevent
     Rotation_duration_fb    expectedeventduration (ms)
+    Level_fb                0-65535 (0-100%) accumulated dial level (volume/dimmer)
 
   STRING OUTPUTS
     LastAnnounced_fb        ISO timestamp
@@ -42,6 +46,7 @@
     Rotary_UniqueID         Optional ZHARelativeRotary endpoint (scroll/dial)
     Number_of_Buttons       1-10
     Online_Timeout_Seconds  Default 120
+    Full_Scale_Rotations    Full turns of the dial for 0-100% (Level_fb), default 2
 
   Programmer : martin@disnamic.com
 */
@@ -66,16 +71,18 @@
 
 #USER_SIMPLSHARP_LIBRARY "DeConzZigbee"
 
-DIGITAL_INPUT  _SKIP_, _SKIP_, _SKIP_, _SKIP_, Get_State, Enable_Debug, Enable_Raw_Json, Permanent_Resend_Enable;
+DIGITAL_INPUT  _SKIP_, _SKIP_, _SKIP_, _SKIP_, _SKIP_, Get_State, Enable_Debug, Enable_Raw_Json, Permanent_Resend_Enable;
 
-DIGITAL_OUTPUT _SKIP_,_SKIP_,_SKIP_,_SKIP_, online, Battery_low, _SKIP_, Rotate_cw, Rotate_ccw;
+DIGITAL_OUTPUT _SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_, online, Battery_low, _SKIP_, Rotate_cw, Rotate_ccw;
 DIGITAL_OUTPUT Button_short_release_fb[MAXBUTTONS];
 DIGITAL_OUTPUT _SKIP_,Button_hold_fb[MAXBUTTONS];
 DIGITAL_OUTPUT _SKIP_,Button_long_release_fb[MAXBUTTONS];
 DIGITAL_OUTPUT _SKIP_,Button_double_press_fb[MAXBUTTONS];
 DIGITAL_OUTPUT _SKIP_,Button_triple_press_fb[MAXBUTTONS];
 
-ANALOG_OUTPUT  Battery_state, _SKIP_, Rotation_fb, Rotary_event_fb, Rotation_duration_fb;
+ANALOG_INPUT   Set_Level;
+
+ANALOG_OUTPUT  Battery_state, _SKIP_, Rotation_fb, Rotary_event_fb, Rotation_duration_fb, _SKIP_, Level_fb;
 
 STRING_OUTPUT  LastAnnounced_fb, LastSeen_fb,
                Manufacturer_fb, ModelId_fb, Name_fb,
@@ -83,7 +90,7 @@ STRING_OUTPUT  LastAnnounced_fb, LastSeen_fb,
                raw_json_out, Debug$;
 
 STRING_PARAMETER  Device_UniqueID[64], Rotary_UniqueID[64];
-INTEGER_PARAMETER Number_of_Buttons, Online_Timeout_Seconds;
+INTEGER_PARAMETER Number_of_Buttons, Online_Timeout_Seconds, Full_Scale_Rotations;
 
 
 #BEGIN_PARAMETER_PROPERTIES Device_UniqueID
@@ -114,6 +121,14 @@ INTEGER_PARAMETER Number_of_Buttons, Online_Timeout_Seconds;
   propDefaultUnit      = unitDecimal;
   propDefaultValue     = 120d;
   propShortDescription = "Offline timeout in seconds (default 120)";
+#END_PARAMETER_PROPERTIES
+
+#BEGIN_PARAMETER_PROPERTIES Full_Scale_Rotations
+  propValidUnits  = unitDecimal;
+  propDefaultUnit = unitDecimal;
+  propBounds      = 1d , 50d ;
+  propDefaultValue = 2d;
+  propShortDescription = "Full dial turns for 0-100% on Level_fb (1 turn = 360 deg)";
 #END_PARAMETER_PROPERTIES
 
 
@@ -154,6 +169,7 @@ CALLBACK FUNCTION CB_RotateCcw(INTEGER v)           { PULSE(50, Rotate_ccw); }
 CALLBACK FUNCTION CB_RotationFb(INTEGER v)          { Rotation_fb          = v; }
 CALLBACK FUNCTION CB_RotaryEventFb(INTEGER v)       { Rotary_event_fb      = v; }
 CALLBACK FUNCTION CB_RotationDurationFb(INTEGER v)  { Rotation_duration_fb = v; }
+CALLBACK FUNCTION CB_LevelFb(INTEGER v)             { Level_fb             = v; }
 
 CALLBACK FUNCTION CB_RawJson(STRING s) { raw_json_out = s; }
 CALLBACK FUNCTION CB_Debug(STRING s)   { Debug$       = s; }
@@ -169,6 +185,7 @@ PUSH Get_State  { myKeypad.GetState(); }
 CHANGE Enable_Debug { myKeypad.SetDebug(Enable_Debug); }
 CHANGE Permanent_Resend_Enable { myKeypad.SetPermanentResend(Permanent_Resend_Enable); }
 CHANGE Enable_Raw_Json { myKeypad.SetRawJsonEnabled(Enable_Raw_Json); }
+CHANGE Set_Level { myKeypad.SetLevel(Set_Level); }
 
 Function Main()
 {
@@ -187,6 +204,7 @@ Function Main()
   RegisterDelegate(myKeypad, OnRotateCcw,          CB_RotateCcw);
   RegisterDelegate(myKeypad, OnRotaryEventFb,      CB_RotaryEventFb);
   RegisterDelegate(myKeypad, OnRotationDurationFb, CB_RotationDurationFb);
+  RegisterDelegate(myKeypad, OnLevelFb,            CB_LevelFb);
   RegisterDelegate(myKeypad, OnRawJson,      CB_RawJson);
   RegisterDelegate(myKeypad, OnDebugOut,     CB_Debug);
   RegisterDelegate(myKeypad, OnLastAnnouncedFb, CB_LastAnnounced);
@@ -200,6 +218,7 @@ Function Main()
   myKeypad.SetRawJsonEnabled(Enable_Raw_Json);
   myKeypad.SetPermanentResend(Permanent_Resend_Enable);
   myKeypad.Initialize(Device_UniqueID, Rotary_UniqueID,
-                      Number_of_Buttons, Online_Timeout_Seconds);
+                      Number_of_Buttons, Online_Timeout_Seconds,
+                      Full_Scale_Rotations);
   myKeypad.SetDebug(Enable_Debug);
 }
