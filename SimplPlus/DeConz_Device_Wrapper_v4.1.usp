@@ -35,14 +35,22 @@
 
 #HELP_BEGIN
   DeConz Device v4.1
-  ----------------------
-  Raw JSON passthrough. One primary + up to 5 optional additional UniqueIDs.
-  Each active UID delivers payloads on its own raw_json_out_N output.
+  ------------------------------------------------------------------
+  Generic raw-JSON passthrough: one primary plus up to 5 optional Zigbee
+  endpoints, each on its own output. No parsing. Feedback via the broker
+  (no wiring to the Gateway). The API key is set centrally on the Gateway.
 
-  Leave UniqueID_2 … UniqueID_6 empty to disable those slots.
+  PARAMETERS
+    Device_UniqueID   primary uniqueid (required)
+    UniqueID_2 … 6    optional extra uniqueids (empty = slot disabled)
 
-  Find the uniqueid in Phoscon App:
-    http://<gateway-ip>/pwa/ → Lights / Sensors → device → Advanced
+  OUTPUTS
+    raw_json_out      payload of Device_UniqueID
+    raw_json_out_2…6  payload of each extra UID (active when its param is set)
+    raw_json_all      all active payloads combined
+
+  NOTES
+    uniqueid: Phoscon (http://<gateway-ip>/pwa/) → Lights/Sensors → Advanced.
 #HELP_END
 
 #USER_SIMPLSHARP_LIBRARY "DeConzZigbee"

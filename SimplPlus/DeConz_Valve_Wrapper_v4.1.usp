@@ -64,18 +64,23 @@
 
 #HELP_BEGIN
   DeConz Valve v4.1
-  -------------------
-  Controls a Zigbee irrigation valve and reads its water sensor.
+  ------------------------------------------------------------------
+  Irrigation valve in one symbol: an On/Off valve endpoint (resource
+  "lights") plus a ZHAWater sensor endpoint (water / battery / flow).
+  Device ids/resources auto-resolve from the first WS event. The API key
+  is set centrally on the Gateway.
 
-  The valve is controlled as an On/Off light endpoint via HTTP PUT.
-  Water detection, battery and flow data come from the ZHAWater sensor endpoint.
-
-  Both device IDs and resource types are resolved automatically from the
-  first incoming WebSocket event – only the two UniqueIDs and the API Key
-  need to be configured.
-
-  GetState fetches both endpoints on connect/reconnect (random 1-15 s delay)
-  and whenever Get_State is pulsed manually.
+  PARAMETERS
+    Valve_UniqueID          On/Off valve endpoint uniqueid
+    Sensor_UniqueID         ZHAWater sensor endpoint uniqueid
+    Flow_Key                JSON key for the flow value (default "flow")
+    Online_Timeout_Seconds  default 120
+  INPUTS   Open_Valve, Close_Valve, Get_State, Enable_Debug/Raw_Json/Perm_Resend
+  OUTPUTS  online, valve_on_fb, valve_off_fb, water_detected, battery_low;
+           battery_level (0-100%); flow_volume_fb, valve_id_fb, sensor_id_fb,
+           device info; valve_raw_json, sensor_raw_json, Debug$
+  NOTES    Only the two uniqueids (and Flow_Key) need configuring; the API key
+           is entered once on the Gateway. GetState on connect (random 1-15 s).
 #HELP_END
 
 #USER_SIMPLSHARP_LIBRARY "DeConzZigbee"

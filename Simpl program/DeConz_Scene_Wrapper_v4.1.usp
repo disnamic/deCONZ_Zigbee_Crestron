@@ -48,19 +48,18 @@
 
 #HELP_BEGIN
   DeConz Scene v4.1
-  -------------------
-  Recall and store deCONZ scenes.
+  ------------------------------------------------------------------
+  Recall and store deCONZ scenes within a group via HTTP. Group and scene
+  are set at runtime; this module has no parameters. The API key is set
+  centrally on the Gateway.
 
-  Set Group_ID and Scene_ID via analog inputs at runtime, then pulse
-  Recall_Scene. The scene is recalled for all reachable lights in the group.
-
-  Store_Scene: captures the current state of all lights in the group and
-  saves it into the specified scene slot.
-
-  Get_Scenes: fetches the scene list for the current Group_ID and outputs
-  it as "id:name,id:name" on scenes_list_fb.
-
-  Note: unreachable (powered off) lights are not affected by Recall_Scene.
+  PARAMETERS  none (Group_ID / Scene_ID are analog inputs)
+  INPUTS   Recall_Scene, Store_Scene, Get_Scenes, Enable_Raw_Json/Debug/
+           Perm_Resend; Group_ID, Scene_ID (analog, > 0)
+  OUTPUTS  Recall_Success_fb / Store_Success_fb (pulses), Last_Recalled_Group_fb,
+           Last_Recalled_Scene_fb, scenes_list_fb ("id:name,id:name"),
+           raw_json_out, Debug$
+  NOTES    Unreachable (powered-off) lights are not affected by Recall_Scene.
 #HELP_END
 
 #USER_SIMPLSHARP_LIBRARY "DeConzZigbee"
