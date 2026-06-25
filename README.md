@@ -195,6 +195,13 @@ combination device such as the IKEA BILRESA (E2490) is a single symbol: the
 wheel click arrives on the ZHASwitch endpoint, the rotation on the separate
 ZHARelativeRotary endpoint.
 
+For a volume or dimmer control the rotation can be accumulated into an absolute
+level: `Level_fb` (0-65535 = 0-100%) sums the signed rotation deltas, clamped to
+0-100%. `Full_Scale_Rotations` sets how many full turns of the dial span the
+whole range (default 2; one turn = 360°). `Set_Level` (0-65535) presets the
+level so the dial tracks the real device value — wire the controlled device's
+current level into it.
+
 ### DeConz_Valve
 
 An irrigation valve modelled as two deCONZ endpoints in one symbol: a valve
