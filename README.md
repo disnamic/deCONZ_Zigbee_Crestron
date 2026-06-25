@@ -330,6 +330,6 @@ rather than the SIMPL+ event loop.
 
 ## Disclaimer
 
-This programming is not created by Crestron Electronics.
-This programming is not supported by Crestron Electronics' support team.
-Crestron Electronics is not liable for any damage caused by this programming.
+- This programming is not created by Crestron Electronics.
+- This programming is not supported by Crestron Electronics' support team.
+- Crestron Electronics is not liable for any damage caused by this programming.
