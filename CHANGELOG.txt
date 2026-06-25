@@ -4,6 +4,67 @@
 ================================================================================
 
 --------------------------------------------------------------------------------
+Version 4.1.0  (2026-06-24)
+--------------------------------------------------------------------------------
+Feature release. Adds the missing LastAnnounced output to the last three modules,
+makes Get_State re-send static device info, and introduces a global/local
+"permanent string re-assert" feature (the internal equivalent of the SIMPL
+"Make String Permanent" symbol). New wrapper signals shift the symbol layout, so
+this carries the v4.1 symbol generation.
+
+BREAKING - SIMPL Windows symbol rename:
+  All 14 module symbols move to the v4.1 generation. #SYMBOL_NAME and the .usp
+  filenames now carry "v4.1" (e.g. "DeConz_Gateway v4.1",
+  DeConz_Gateway_Wrapper_v4.1.usp). Existing v4.0 symbols must be replaced with
+  the v4.1 symbols; re-check signal connections after the swap (see the signal
+  shifts below).
+
+LastAnnounced output added (Power, Alarm, Motion):
+  - New STRING_OUTPUT LastAnnounced_fb, placed directly after LastSeen_fb (as on
+    all other modules). Parses the top-level "lastannounced" timestamp. This
+    shifts the following string outputs (Manufacturer/ModelId/Name/raw JSON) down
+    by one position on these three modules.
+
+Get_State now refreshes static device info (all device-info modules):
+  - Contact, Climate, Valve, Motion, Power, Keypad, Shade, Thermostat, LightWs,
+    Alarm: a Get_State pulse now re-sends Manufacturer/ModelId/Name (and the
+    other once-only identity strings), which were previously emitted only once
+    per online session. Internally the _staticInfoSent guard is reset at the
+    start of GetState().
+
+Permanent string re-assert ("Make String Permanent" equivalent):
+  - While enabled, each device-info module periodically re-fires its cached
+    (non-raw, non-debug) string outputs, so late-joining sinks (panel reconnect,
+    program restart) always see the current values.
+  - Gateway: new DIGITAL_INPUT Permanent_Resend_Enable (global, acts on ALL
+    modules) and new INTEGER_PARAMETER Permanent_Resend_Seconds (interval,
+    default 30, range 1-3600). The new parameter shifts the gateway symbol's
+    parameter and digital-input layout - re-check gateway connections.
+  - Each device-info module: new local DIGITAL_INPUT Permanent_Resend_Enable,
+    appended at the end of the digital-input block.
+  - Effective state per module = Gateway enable OR local enable. The Gateway
+    enable, when high, forces re-assert on all modules (overrides the locals);
+    when low, each module's local enable applies. Routed AppDomain-wide via the
+    static broker; the interval is read on every tick.
+
+Central API key (BREAKING – parameter removed from every device module):
+  - The deCONZ API key is now entered ONCE on the Gateway, as a new
+    STRING_PARAMETER API_Key, and distributed to all device modules via the
+    static broker (DeConzBroker.ApiKey). Device modules read it lazily when
+    building their HTTP request URLs.
+  - The per-module API_Key parameter has been removed from all 12 modules that
+    use it (Power, Alarm, Climate, Keypad, GroupControl, Motion, Contact, Valve,
+    Scene, LightWs, Shade, Thermostat). Removing this parameter shifts the
+    symbol's leading _SKIP_ count down by one (the first DIGITAL_INPUT and
+    DIGITAL_OUTPUT block) – re-check signal connections. GroupControl and Scene
+    now have no parameters at all.
+  - The Gateway gains the API_Key parameter; together with Permanent_Resend_
+    Seconds this shifts the gateway symbol's parameter and signal layout.
+
+Build:
+  - AssemblyVersion / AssemblyFileVersion 4.1.0.0.
+
+--------------------------------------------------------------------------------
 Version 4.0.0  (2026-06-23)
 --------------------------------------------------------------------------------
 Major release. The whole suite moves to the v4.0 symbol generation and the

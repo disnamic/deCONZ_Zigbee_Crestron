@@ -1,0 +1,224 @@
+/*****
+  DeConz_Shade_Wrapper_v4.1.usp
+  SIMPL+ Wrapper for DeConzShade (SIMPL# class)
+
+  Zigbee window covering – shade / blind / drape.
+  Commands via HTTP PUT, feedback via WebSocket (DeConzBroker).
+  Device ID and resource type resolved automatically from first WS event.
+
+  deCONZ lift convention: 0 = open, 100 = closed.
+  Set Invert_Lift = 1 to mirror this (0 = closed, 100 = open) for SIMPL.
+
+  DIGITAL INPUTS
+    Move_up         Pulse → {"open":true}  (fully open)
+    Move_down       Pulse → {"open":false} (fully closed)
+    Stop            Pulse → {"stop":true}
+    Get_State       Pulse → HTTP GET
+    Enable_Debug    High  → debug on Debug$
+
+  ANALOG INPUTS
+    Lift_percentage 0-100 → {"lift":n}
+    Tilt_percentage 0-100 → {"tilt":n}  (venetian blinds)
+
+  DIGITAL OUTPUTS
+    online          1 = WS alive within Online_Timeout_Seconds
+    lowbattery_fb   1 = low battery
+    open_fb         1 = fully open
+    closed_fb       1 = fully closed
+    moving_fb       1 = moving (target not yet reached)
+
+  ANALOG OUTPUTS
+    Battery_state          0-100 %
+    Lift_percentage_fb     0-100 (per Invert_Lift)
+    Tilt_percentage_fb     0-100 (per Invert_Lift)
+
+  STRING OUTPUTS
+    device_id_fb / LastSeen_fb / LastAnnounced_fb /
+    Manufacturer_fb / ModelId_fb / Name_fb / Type_fb /
+    raw_json_out / Debug$
+
+  PARAMETERS
+    Device_UniqueID         Zigbee uniqueid of shade endpoint
+    Battery_UniqueID        ZHABattery sensor uniqueid (optional)
+    Invert_Lift             0 = native (0 open), 1 = inverted (0 closed)
+    Open_Threshold          lift % at which open_fb = 1 (default 1)
+    Closed_Threshold        lift % at which closed_fb = 1 (default 99)
+    Online_Timeout_Seconds  default 120
+
+  Programmer : martin@disnamic.com
+*/
+
+#SYMBOL_NAME "DeConz_Shade v4.1"
+#CATEGORY "46" "DeConZ_Zigbee"
+
+#DEFAULT_VOLATILE
+#ENABLE_STACK_CHECKING
+#ENABLE_TRACE
+
+#HELP_BEGIN
+  DeConz Shade v4.1
+  -------------------
+  Zigbee window covering control + feedback.
+
+  Move_up / Move_down / Stop for basic control, Lift_percentage for absolute
+  position, Tilt_percentage for lamella angle on venetian blinds.
+
+  Lift convention is deCONZ-native (0 open / 100 closed). Set Invert_Lift = 1
+  to mirror both lift command and feedback.
+
+  GetState fires automatically on connect/reconnect (random 1-15 s delay).
+  moving_fb is heuristic: set on a command, cleared when the reported lift
+  reaches the commanded target or after a short timeout.
+#HELP_END
+
+#USER_SIMPLSHARP_LIBRARY "DeConzZigbee"
+
+/*****
+  I/O Declarations
+*/
+DIGITAL_INPUT  _SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,
+               Move_up, Move_down, Stop, _SKIP_,
+               Get_State, Enable_Debug, Enable_Raw_Json, Permanent_Resend_Enable;
+
+ANALOG_INPUT   Lift_percentage, Tilt_percentage;
+
+DIGITAL_OUTPUT _SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,_SKIP_,
+               online, _SKIP_, lowbattery_fb, _SKIP_,
+               open_fb, closed_fb, moving_fb;
+
+ANALOG_OUTPUT  Battery_state, Voltage_fb, _SKIP_,
+               Lift_percentage_fb, Tilt_percentage_fb;
+
+STRING_OUTPUT  device_id_fb, LastSeen_fb, LastAnnounced_fb,
+               Manufacturer_fb, ModelId_fb, Name_fb, Type_fb,
+               _SKIP_,
+               battery_raw_json, raw_json_out, Debug$;
+
+/*****
+  Parameters
+*/
+STRING_PARAMETER  Device_UniqueID[64], Battery_UniqueID[64];
+INTEGER_PARAMETER Invert_Lift, Open_Threshold, Closed_Threshold, Online_Timeout_Seconds;
+
+
+#BEGIN_PARAMETER_PROPERTIES Device_UniqueID
+  propValidUnits       = unitString;
+  propDefaultValue     = "00:00:00:00:00:00:00:00-01";
+  propShortDescription = "Zigbee uniqueid (Phoscon App → device → Advanced)";
+#END_PARAMETER_PROPERTIES
+
+#BEGIN_PARAMETER_PROPERTIES Invert_Lift
+  propValidUnits       = unitDecimal;
+  propDefaultUnit      = unitDecimal;
+  propDefaultValue     = 0d;
+  propList = { 0d, "Native (0=open, 100=closed)" }, { 1d, "Inverted (0=closed, 100=open)" };
+  propShortDescription = "Invert lift/tilt scale for SIMPL";
+#END_PARAMETER_PROPERTIES
+
+#BEGIN_PARAMETER_PROPERTIES Battery_UniqueID
+  propValidUnits       = unitString;
+  propDefaultValue     = "";
+  propShortDescription = "ZHABattery sensor uniqueid (leave empty if not separate)";
+#END_PARAMETER_PROPERTIES
+
+#BEGIN_PARAMETER_PROPERTIES Open_Threshold
+  propValidUnits       = unitDecimal;
+  propDefaultUnit      = unitDecimal;
+  propDefaultValue     = 1d;
+  propShortDescription = "Lift % at which open_fb = 1 (lift <= value, default 1)";
+#END_PARAMETER_PROPERTIES
+
+#BEGIN_PARAMETER_PROPERTIES Closed_Threshold
+  propValidUnits       = unitDecimal;
+  propDefaultUnit      = unitDecimal;
+  propDefaultValue     = 99d;
+  propShortDescription = "Lift % at which closed_fb = 1 (lift >= value, default 99)";
+#END_PARAMETER_PROPERTIES
+
+#BEGIN_PARAMETER_PROPERTIES Online_Timeout_Seconds
+  propValidUnits       = unitDecimal;
+  propDefaultUnit      = unitDecimal;
+  propDefaultValue     = 120d;
+  propShortDescription = "Seconds without WS traffic until online→0 (default 120)";
+#END_PARAMETER_PROPERTIES
+
+/*****
+  SIMPL# Object
+*/
+DeConzShade myShade;
+
+/*****
+  Delegate Callbacks
+*/
+CALLBACK FUNCTION CB_Online(INTEGER v)      { online              = v; }
+CALLBACK FUNCTION CB_LowBattery(INTEGER v)  { lowbattery_fb       = v; }
+CALLBACK FUNCTION CB_BatteryLevel(INTEGER v){ Battery_state       = v; }
+CALLBACK FUNCTION CB_LiftFb(INTEGER v)      { Lift_percentage_fb  = v; }
+CALLBACK FUNCTION CB_TiltFb(INTEGER v)      { Tilt_percentage_fb  = v; }
+CALLBACK FUNCTION CB_OpenFb(INTEGER v)      { open_fb             = v; }
+CALLBACK FUNCTION CB_ClosedFb(INTEGER v)    { closed_fb           = v; }
+CALLBACK FUNCTION CB_MovingFb(INTEGER v)    { moving_fb           = v; }
+
+CALLBACK FUNCTION CB_DeviceId(STRING s)     { device_id_fb        = s; }
+CALLBACK FUNCTION CB_LastSeen(STRING s)     { LastSeen_fb         = s; }
+CALLBACK FUNCTION CB_LastAnnounced(STRING s){ LastAnnounced_fb    = s; }
+CALLBACK FUNCTION CB_Manufacturer(STRING s) { Manufacturer_fb     = s; }
+CALLBACK FUNCTION CB_ModelId(STRING s)      { ModelId_fb          = s; }
+CALLBACK FUNCTION CB_Name(STRING s)         { Name_fb             = s; }
+CALLBACK FUNCTION CB_Type(STRING s)         { Type_fb             = s; }
+CALLBACK FUNCTION CB_RawJson(STRING s)      { raw_json_out        = s; }
+CALLBACK FUNCTION CB_Debug(STRING s)        { Debug$              = s; }
+CALLBACK FUNCTION CB_VoltageFb(INTEGER v)   { Voltage_fb          = v; }
+CALLBACK FUNCTION CB_BatteryRaw(STRING s)   { battery_raw_json    = s; }
+
+/*****
+  Input Handlers
+*/
+PUSH Move_up    { myShade.MoveUp();   }
+PUSH Move_down  { myShade.MoveDown(); }
+PUSH Stop       { myShade.Stop();     }
+PUSH Get_State  { myShade.GetState(); }
+
+CHANGE Enable_Debug { myShade.SetDebug(Enable_Debug); }
+CHANGE Permanent_Resend_Enable { myShade.SetPermanentResend(Permanent_Resend_Enable); }
+CHANGE Enable_Raw_Json { myShade.SetRawJsonEnabled(Enable_Raw_Json); }
+
+THREADSAFE CHANGE Lift_percentage { myShade.SetLift(Lift_percentage); }
+THREADSAFE CHANGE Tilt_percentage { myShade.SetTilt(Tilt_percentage); }
+
+/*****
+  Main
+*/
+Function Main()
+{
+  WaitForInitializationComplete();
+
+  RegisterDelegate(myShade, OnOnline,          CB_Online);
+  RegisterDelegate(myShade, OnLowBattery,      CB_LowBattery);
+  RegisterDelegate(myShade, OnBatteryLevel,    CB_BatteryLevel);
+  RegisterDelegate(myShade, OnLiftFb,          CB_LiftFb);
+  RegisterDelegate(myShade, OnTiltFb,          CB_TiltFb);
+  RegisterDelegate(myShade, OnOpenFb,          CB_OpenFb);
+  RegisterDelegate(myShade, OnClosedFb,        CB_ClosedFb);
+  RegisterDelegate(myShade, OnMovingFb,        CB_MovingFb);
+  RegisterDelegate(myShade, OnDeviceIdFb,      CB_DeviceId);
+  RegisterDelegate(myShade, OnLastSeenFb,      CB_LastSeen);
+  RegisterDelegate(myShade, OnLastAnnouncedFb, CB_LastAnnounced);
+  RegisterDelegate(myShade, OnManufacturerFb,  CB_Manufacturer);
+  RegisterDelegate(myShade, OnModelIdFb,       CB_ModelId);
+  RegisterDelegate(myShade, OnNameFb,          CB_Name);
+  RegisterDelegate(myShade, OnTypeFb,          CB_Type);
+  RegisterDelegate(myShade, OnVoltageFb,      CB_VoltageFb);
+  RegisterDelegate(myShade, OnBatteryRawJson, CB_BatteryRaw);
+  RegisterDelegate(myShade, OnRawJsonFb,      CB_RawJson);
+  RegisterDelegate(myShade, OnDebugOut,        CB_Debug);
+
+  myShade.SetOnlineTimeout(Online_Timeout_Seconds);
+  myShade.SetInvertLift(Invert_Lift);
+  myShade.SetOpenThreshold(Open_Threshold);
+  myShade.SetClosedThreshold(Closed_Threshold);
+  myShade.SetRawJsonEnabled(Enable_Raw_Json);
+  myShade.SetPermanentResend(Permanent_Resend_Enable);
+  myShade.Initialize(Device_UniqueID, Battery_UniqueID);
+  myShade.SetDebug(Enable_Debug);
+}

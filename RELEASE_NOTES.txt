@@ -1,12 +1,50 @@
 ================================================================================
  DeConz Zigbee – Crestron SIMPL# Module Suite
- Version 4.0.0
- 2026-06-23
+ Version 4.1.0
+ 2026-06-25
 ================================================================================
 
-This major release moves the whole suite to the v4.0 symbol generation and adds
-two gateway connection parameters. There are no new device modules and no new
-device features over 3.6.0 — see the sections below for the full feature history.
+This feature release adds the missing LastAnnounced output to the last three
+modules, makes Get_State re-send static device info, introduces a global/local
+"permanent string re-assert" feature, and centralises the deCONZ API key on the
+Gateway. New wrapper signals shift the symbol layout, so the whole suite moves
+to the v4.1 symbol generation — see the sections below for the full history.
+
+--------------------------------------------------------------------------------
+ What is new in 4.1
+--------------------------------------------------------------------------------
+
+Symbol rename to the v4.1 generation (breaking in SIMPL Windows)
+  #SYMBOL_NAME and the .usp filenames now carry "v4.1". Existing v4.0 symbols
+  must be replaced with the v4.1 symbols and their signal connections re-checked,
+  because several signal and parameter positions shift (see below).
+
+Central deCONZ API key (breaking – parameter removed from every device module)
+  The API key is entered ONCE on the Gateway (new STRING_PARAMETER API_Key) and
+  distributed to all device modules via the static broker. The per-module
+  API_Key parameter is removed from all 12 modules that used it; this shifts
+  each symbol's leading _SKIP_ count down by one. GroupControl and Scene now
+  have no parameters at all.
+
+Permanent string re-assert ("Make String Permanent" equivalent)
+  While enabled, each device-info module periodically re-fires its cached
+  (non-raw, non-debug) string outputs so late-joining sinks always see current
+  values. The Gateway gains Permanent_Resend_Enable (global) and a
+  Permanent_Resend_Seconds interval parameter (default 30); each device module
+  gains a local Permanent_Resend_Enable. Effective state = Gateway OR local.
+
+Get_State refreshes static device info
+  A Get_State pulse now re-sends Manufacturer / ModelId / Name (and the other
+  once-only identity strings) on all device-info modules, not just on the first
+  WebSocket event of a session.
+
+LastAnnounced output added to Power, Alarm and Motion
+  These three modules gain the LastAnnounced_fb string output (after LastSeen_fb)
+  that every other module already exposed, shifting their following string
+  outputs down by one position.
+
+Build
+  AssemblyVersion / AssemblyFileVersion 4.1.0.0.
 
 --------------------------------------------------------------------------------
  What is new in 4.0
@@ -171,15 +209,17 @@ Group and scene management (completed from v3.0)
 
   - Crestron 4-Series control system
   - deCONZ gateway (ConBee / RaspBee with Phoscon)
-  - deCONZ API key and Zigbee uniqueid of each device
+  - deCONZ API key (entered once on the Gateway) and the Zigbee uniqueid of
+    each device
 
 --------------------------------------------------------------------------------
  Installation
 --------------------------------------------------------------------------------
 
   Copy DeConzZigbee.clz into the SIMPL project folder, add the desired
-  DeConz_*_Wrapper symbols and set their parameters. No signal wiring between
-  the gateway module and the device modules is required.
+  DeConz_*_Wrapper symbols and set their parameters. Enter the API key once on
+  the Gateway (API_Key parameter); device modules take only their uniqueids. No
+  signal wiring between the gateway module and the device modules is required.
 
   Uniqueids and API key: Phoscon app at http://<gateway-ip>/pwa/
   Group and scene IDs: visible in Phoscon group and scene configuration.

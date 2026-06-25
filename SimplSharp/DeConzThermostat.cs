@@ -116,7 +116,7 @@ namespace DeConzZigbee
         public ThermostatStringDelegate OnDebugOut           { get; set; }
 
         // ── Private state ─────────────────────────────────────────────────
-        private string _apiKey;
+        private string _apiKey { get { return DeConzBroker.ApiKey ?? ""; } }
 
         // Thermostat endpoint
         private string _uniqueId;
@@ -154,7 +154,7 @@ namespace DeConzZigbee
         /// Optional uniqueid of the ZHABattery endpoint (e.g. "…:01-0001").
         /// Pass empty string or null if the device has no separate battery endpoint.
         /// </param>
-        public void Initialize(string uniqueId, string batteryUniqueId, string apiKey)
+        public void Initialize(string uniqueId, string batteryUniqueId)
         {
             if (string.IsNullOrEmpty(uniqueId))
             {
@@ -163,7 +163,6 @@ namespace DeConzZigbee
             }
 
             _uniqueId    = uniqueId.Trim().ToLowerInvariant();
-            _apiKey      = apiKey ?? "";
             _initialized = true;
 
             _http.TimeoutEnabled = true;
@@ -188,6 +187,8 @@ namespace DeConzZigbee
                 _hasBatteryEndpoint ? _batteryUid : "(none)"));
 
             _staleTimer = new CTimer(_ => CheckStale(), null, 300000, 300000);
+            _permRun = true;
+            ArmPermTimer();
         }
 
         public void SetOnlineTimeout(int seconds)
@@ -200,6 +201,7 @@ namespace DeConzZigbee
 
         public void Dispose()
         {
+            _permRun = false;
             if (_staleTimer != null) { _staleTimer.Stop(); _staleTimer = null; }
             if (!_initialized) return;
             DeConzBroker.UnregisterDevice(_uniqueId, OnWsUpdate);
@@ -296,6 +298,7 @@ namespace DeConzZigbee
             if (!EnsureUrls()) return;
             string url = BaseUrl();
             if (string.IsNullOrEmpty(url)) return;
+            _staticInfoSent = false;   // re-send static device info on manual refresh
             DebugLog("[Thermo:" + _uniqueId + "] GET " + url);
             try
             {
@@ -878,10 +881,58 @@ namespace DeConzZigbee
         private static void Fire(ThermostatLevelDelegate cb, ushort v)
         { if (cb != null) try { cb(v); } catch { } }
 
-        private static void FireStr(ThermostatStringDelegate cb, string s)
+        // ── Permanent string re-assert (Make-String-Permanent equivalent) ──
+        // Periodically re-fire the cached (non-raw, non-debug) string outputs
+        // while the global or this module's local enable is high, so late
+        // joining sinks always see the current values.
+        private readonly System.Collections.Generic.Dictionary<object, string> _lastStr
+            = new System.Collections.Generic.Dictionary<object, string>();
+        private readonly CCriticalSection _strLock = new CCriticalSection();
+        private bool _permLocal;
+        private bool _permRun;
+
+        public void SetPermanentResend(ushort e) { _permLocal = (e != 0); }
+
+        private void ArmPermTimer()
+        {
+            int ms = DeConzBroker.PermanentResendMs;
+            if (ms < 1000) ms = 30000;
+            CTimer t = null;
+            t = new CTimer(_ =>
+            {
+                if (DeConzBroker.GlobalPermanentResend || _permLocal) ReassertStrings();
+                if (t != null) t.Dispose();
+                if (_permRun) ArmPermTimer();
+            }, null, ms);
+        }
+
+        private void ReassertStrings()
+        {
+            System.Collections.Generic.KeyValuePair<object, string>[] snap;
+            _strLock.Enter();
+            try
+            {
+                snap = new System.Collections.Generic.KeyValuePair<object, string>[_lastStr.Count];
+                ((System.Collections.Generic.ICollection<System.Collections.Generic.KeyValuePair<object, string>>)_lastStr).CopyTo(snap, 0);
+            }
+            finally { _strLock.Leave(); }
+            for (int i = 0; i < snap.Length; i++)
+            {
+                var cb = snap[i].Key as ThermostatStringDelegate;
+                if (cb != null) try { cb(new SimplSharpString(snap[i].Value)); } catch { }
+            }
+        }
+
+        private void FireStr(ThermostatStringDelegate cb, string s)
         {
             if (cb == null || s == null) return;
             if (s.Length > 250) s = s.Substring(0, 250);
+            if (cb != OnDebugOut)
+            {
+                _strLock.Enter();
+                try { _lastStr[cb] = s; }
+                finally { _strLock.Leave(); }
+            }
             try { cb(new SimplSharpString(s)); } catch { }
         }
 

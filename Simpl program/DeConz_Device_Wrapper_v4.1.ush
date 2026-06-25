@@ -1,0 +1,181 @@
+[BEGIN]
+  Version=1
+[END]
+[BEGIN]
+  ObjTp=FSgntr
+  Sgntr=UserSPlus
+  RelVrs=1
+  IntStrVrs=1
+  SPlusVrs=4.06.00
+  CrossCplrVrs=1.3
+[END]
+[BEGIN]
+  ObjTp=Hd
+  Cmn1=||2DeConz Device v4.1\\  ----------------------\\  Raw JSON passthrough.
+  Cmn2=||1One primary + up to 5 optional additional UniqueIDs.\\  Each active||1
+  Cmn3=UID delivers payloads on its own raw_json_out_N output.\\\\  Leave||1
+  Cmn4=UniqueID_2 … UniqueID_6 empty to disable those slots.\\\\  Find||1
+  Cmn5=the uniqueid in Phoscon App:\\    http://<gateway-ip>/pwa/ → Lights||1
+  Cmn6=/ Sensors → device → Advanced
+[END]
+[BEGIN]
+  ObjTp=Symbol
+  Exclusions=1,19,20,21,88,89,167,168,179,213,214,215,216,217,225,226,248,249,266,267,310,362,378,380,405,407,408,409,478,522,537,554,586,590,611,624,718,756,767,830,841,842,854,883,955,1032,1062,1079,1128,1129,1134,1140,1157,1158,1195,1199,1220,1221,1222,1223,1299,1348,1349,1439,1472,1473,1499,1746,1766,1803,1975,2229,2354,2514,2523,2532,2567,2574,2590,2651,2655,2706,2707,2817,2886,2938,2947,3181,3197,3233,3235,3236,3427,3454,3567,3568,3601,3602,3680,3682,3706,3708,3710,3735,3736,3816,3888,3902,3903,3912,3918,3925,3926,4176,4193,4206,4207,4308,4476,4591,4769,5360,5388,5420,5455,5497,5699,5813,5919,6150,6161,
+  Exclusions_CDS=5,6
+  Inclusions_CDS=7
+  Name=DeConz_Device v4.1
+  SmplCName=DeConz_Device_Wrapper_v4.1.usp
+  Code=1
+  SysRev5=4.000
+  SMWRev=3.00.00
+  InputCue1=[~UNUSED~]
+  InputSigType1=Digital
+  InputCue2=[~UNUSED~]
+  InputSigType2=Digital
+  InputCue3=[~UNUSED~]
+  InputSigType3=Digital
+  InputCue4=[~UNUSED~]
+  InputSigType4=Digital
+  InputCue5=[~UNUSED~]
+  InputSigType5=Digital
+  InputCue6=[~UNUSED~]
+  InputSigType6=Digital
+  InputCue7=Enable_Raw_Json
+  InputSigType7=Digital
+  OutputList2Cue1=raw_json_out
+  OutputList2SigType1=Serial
+  OutputList2Cue2=raw_json_out_2
+  OutputList2SigType2=Serial
+  OutputList2Cue3=raw_json_out_3
+  OutputList2SigType3=Serial
+  OutputList2Cue4=raw_json_out_4
+  OutputList2SigType4=Serial
+  OutputList2Cue5=raw_json_out_5
+  OutputList2SigType5=Serial
+  OutputList2Cue6=raw_json_out_6
+  OutputList2SigType6=Serial
+  OutputList2Cue7=raw_json_all
+  OutputList2SigType7=Serial
+  ParamCue1=[Reference Name]
+  ParamCue2=Device_UniqueID
+  ParamSigType2=String
+  ParamCue3=UniqueID_2
+  ParamSigType3=String
+  ParamCue4=UniqueID_3
+  ParamSigType4=String
+  ParamCue5=UniqueID_4
+  ParamSigType5=String
+  ParamCue6=UniqueID_5
+  ParamSigType6=String
+  ParamCue7=UniqueID_6
+  ParamSigType7=String
+  MinVariableInputs=7
+  MaxVariableInputs=7
+  MinVariableInputsList2=0
+  MaxVariableInputsList2=0
+  MinVariableOutputs=0
+  MaxVariableOutputs=0
+  MinVariableOutputsList2=7
+  MaxVariableOutputsList2=7
+  MinVariableParams=6
+  MaxVariableParams=6
+  Expand=expand_separately
+  Expand2=expand_separately
+  ProgramTree=Logic
+  SymbolTree=46
+  UserSymTreeName=DeConZ_Zigbee
+  Hint=
+  PdfHelp=
+  HelpID= 
+  Render=4
+  Smpl-C=16
+  CompilerCode=-48
+  CompilerParamCode=27
+  CompilerParamCode5=14
+  NumFixedParams=1
+  Pp1=1
+  Pp2=2
+  Pp3=3
+  Pp4=4
+  Pp5=5
+  Pp6=6
+  Pp7=7
+  MPp=7
+  NVStorage=10
+  ParamSigType1=String
+  SmplCInputCue1=o#
+  SmplCOutputCue1=i#
+  SmplCInputList2Cue1=an#
+  SmplCOutputList2Cue1=ai#
+  SPlus2CompiledName=S2_DeConz_Device_Wrapper_v4_1
+  SymJam=NonExclusive
+  FileName=DeConz_Device_Wrapper_v4.1.ush
+  SIMPLPlusModuleEncoding=0
+  clz1=DeConzZigbee
+[END]
+[BEGIN]
+  ObjTp=Dp
+  H=1
+  Tp=1
+  NoS=False
+[END]
+[BEGIN]
+  ObjTp=Dp
+  H=2
+  Tp=1
+  SD=Primary deCONZ uniqueid (required)
+  HD=True
+  DV=00:00:00:00:00:00:00:00-00
+  NoS=False
+  VVS=0
+[END]
+[BEGIN]
+  ObjTp=Dp
+  H=3
+  Tp=1
+  SD=Additional uniqueid 2 (optional – leave empty to disable)
+  HD=True
+  DV=
+  NoS=False
+  VVS=0
+[END]
+[BEGIN]
+  ObjTp=Dp
+  H=4
+  Tp=1
+  SD=Additional uniqueid 3 (optional – leave empty to disable)
+  HD=True
+  DV=
+  NoS=False
+  VVS=0
+[END]
+[BEGIN]
+  ObjTp=Dp
+  H=5
+  Tp=1
+  SD=Additional uniqueid 4 (optional – leave empty to disable)
+  HD=True
+  DV=
+  NoS=False
+  VVS=0
+[END]
+[BEGIN]
+  ObjTp=Dp
+  H=6
+  Tp=1
+  SD=Additional uniqueid 5 (optional – leave empty to disable)
+  HD=True
+  DV=
+  NoS=False
+  VVS=0
+[END]
+[BEGIN]
+  ObjTp=Dp
+  H=7
+  Tp=1
+  SD=Additional uniqueid 6 (optional – leave empty to disable)
+  HD=True
+  DV=
+  NoS=False
+  VVS=0
+[END]

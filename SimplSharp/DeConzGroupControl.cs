@@ -54,7 +54,7 @@ namespace DeConzZigbee
         public GroupStringDelegate OnDebugOut      { get; set; }
 
         // ── Private state ─────────────────────────────────────────────────
-        private string _apiKey;
+        private string _apiKey { get { return DeConzBroker.ApiKey ?? ""; } }
         private bool   _debugEnabled;
         private bool   _rawJsonEnabled;
 
@@ -76,9 +76,8 @@ namespace DeConzZigbee
 
         // ── Public API ────────────────────────────────────────────────────
 
-        public void Initialize(string apiKey)
+        public void Initialize()
         {
-            _apiKey = apiKey ?? "";
             _http.TimeoutEnabled = true;
             _http.Timeout        = 10;
             DebugLog("[GroupControl] Initialized");

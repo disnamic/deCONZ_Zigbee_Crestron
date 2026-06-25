@@ -1,0 +1,205 @@
+/*
+  DeConz_Light_WS_Wrapper_v4.1.usp
+  SIMPL+ Wrapper for DeConzLightWs (SIMPL# class)
+
+  Commands via HTTP PUT/GET, feedback via WebSocket.
+  Device ID and resource auto-resolved from first WS event.
+  Configure only Device_UniqueID (the API key is set centrally in the Gateway).
+
+  DIGITAL INPUTS
+    Set_On / Set_Off / Get_State / SET_RGB / Enable_Debug
+
+  ANALOG INPUTS
+    Brightness_In / Colortemp_In / Hue_In / Sat_In / R_In / G_In / B_In
+
+  STRING INPUTS
+    X_Coordinate / Y_Coordinate / Effect_In
+
+  DIGITAL OUTPUTS (state)
+    online / On_fb / Off_fb
+    hascolor_fb
+
+  ANALOG OUTPUTS
+    Brightness_fb / Colortemp_fb / Hue_fb / Sat_fb / R_fb / G_fb / B_fb
+
+  STRING OUTPUTS (state)
+    X_fb / Y_fb / Colormode_fb / Effect_fb
+    device_id_fb / raw_json_out / Debug$
+
+  STRING OUTPUTS (device info – from HTTP GET)
+    Groups_fb           comma-separated group IDs e.g. "0,9,17,23"
+    LastAnnounced_fb    ISO timestamp
+    LastSeen_fb         ISO timestamp
+    Manufacturer_fb     manufacturername
+    ModelId_fb          modelid
+    Name_fb             name
+    SwVersion_fb        swversion
+    Type_fb             type
+
+  PARAMETERS
+    Device_UniqueID / Online_Timeout_Seconds
+
+  Programmer : martin@disnamic.com
+*/
+
+#SYMBOL_NAME "DeConz_Light_WS v4.1"
+#CATEGORY "46" "DeConZ_Zigbee"
+
+#DEFAULT_VOLATILE
+#ENABLE_STACK_CHECKING
+#ENABLE_TRACE
+
+#HELP_BEGIN
+  DeConz Light WS v4.1
+  ----------------------
+  Commands via HTTP PUT, feedback via WebSocket.
+  Device info (groups, manufacturer, model etc.) populated on HTTP GET.
+  GetState fires automatically on connect/reconnect (random 1-15 s delay).
+#HELP_END
+
+#USER_SIMPLSHARP_LIBRARY "DeConzZigbee"
+
+DIGITAL_INPUT  _SKIP_,_SKIP_,
+               Set_On, Set_Off, SET_RGB, _SKIP_,
+               Get_State, Enable_Debug, Enable_Raw_Json, Permanent_Resend_Enable;
+
+ANALOG_INPUT   Brightness_In, Colortemp_In, Hue_In, Sat_In,_SKIP_,
+               R_In, G_In, B_In;
+
+STRING_INPUT   X_Coordinate[12], Y_Coordinate[12], _SKIP_,Effect_In[20];
+
+DIGITAL_OUTPUT _SKIP_, _SKIP_,online, On_fb, Off_fb,_SKIP_, hascolor_fb;
+
+ANALOG_OUTPUT  Brightness_fb, Colortemp_fb,
+               Hue_fb, Sat_fb,_SKIP_,
+               R_fb, G_fb, B_fb;
+
+STRING_OUTPUT  X_fb, Y_fb, Colormode_fb, Effect_fb, _SKIP_,
+               device_id_fb, Groups_fb,
+               LastAnnounced_fb, LastSeen_fb,
+               Manufacturer_fb, ModelId_fb, Name_fb, SwVersion_fb, Type_fb, _SKIP_,
+               raw_json_out, Debug$;
+
+STRING_PARAMETER  Device_UniqueID[64];
+INTEGER_PARAMETER Online_Timeout_Seconds;
+
+
+#BEGIN_PARAMETER_PROPERTIES Device_UniqueID
+  propValidUnits       = unitString;
+  propDefaultValue     = "00:00:00:00:00:00:00:00-00";
+  propShortDescription = "Zigbee uniqueid (Phoscon App → device → Advanced)";
+#END_PARAMETER_PROPERTIES
+
+#BEGIN_PARAMETER_PROPERTIES Online_Timeout_Seconds
+  propValidUnits       = unitDecimal;
+  propDefaultUnit      = unitDecimal;
+  propDefaultValue     = 120d;
+  propShortDescription = "Seconds without WS traffic until online→0 (default 120)";
+#END_PARAMETER_PROPERTIES
+
+DeConzLightWs myLight;
+
+STRING sX[12], sY[12];
+
+CALLBACK FUNCTION CB_Online(INTEGER v)      { online        = v; }
+CALLBACK FUNCTION CB_OnFb(INTEGER v)        { On_fb         = v; }
+CALLBACK FUNCTION CB_OffFb(INTEGER v)       { Off_fb        = v; }
+CALLBACK FUNCTION CB_BrightnessFb(INTEGER v){ Brightness_fb = v; }
+CALLBACK FUNCTION CB_ColortempFb(INTEGER v) { Colortemp_fb  = v; }
+CALLBACK FUNCTION CB_HueFb(INTEGER v)       { Hue_fb        = v; }
+CALLBACK FUNCTION CB_SatFb(INTEGER v)       { Sat_fb        = v; }
+CALLBACK FUNCTION CB_RFb(INTEGER v)         { R_fb          = v; }
+CALLBACK FUNCTION CB_GFb(INTEGER v)         { G_fb          = v; }
+CALLBACK FUNCTION CB_BFb(INTEGER v)         { B_fb          = v; }
+CALLBACK FUNCTION CB_HasColor(INTEGER v)    { hascolor_fb   = v; }
+
+CALLBACK FUNCTION CB_XFb(STRING s)          { X_fb              = s; }
+CALLBACK FUNCTION CB_YFb(STRING s)          { Y_fb              = s; }
+CALLBACK FUNCTION CB_ColormodeFb(STRING s)  { Colormode_fb      = s; }
+CALLBACK FUNCTION CB_EffectFb(STRING s)     { Effect_fb         = s; }
+CALLBACK FUNCTION CB_DeviceIdFb(STRING s)   { device_id_fb      = s; }
+CALLBACK FUNCTION CB_RawJson(STRING s)      { raw_json_out      = s; }
+CALLBACK FUNCTION CB_Debug(STRING s)        { Debug$            = s; }
+CALLBACK FUNCTION CB_Groups(STRING s)       { Groups_fb         = s; }
+CALLBACK FUNCTION CB_LastAnnounced(STRING s){ LastAnnounced_fb  = s; }
+CALLBACK FUNCTION CB_LastSeen(STRING s)     { LastSeen_fb       = s; }
+CALLBACK FUNCTION CB_Manufacturer(STRING s) { Manufacturer_fb   = s; }
+CALLBACK FUNCTION CB_ModelId(STRING s)      { ModelId_fb        = s; }
+CALLBACK FUNCTION CB_Name(STRING s)         { Name_fb           = s; }
+CALLBACK FUNCTION CB_SwVersion(STRING s)    { SwVersion_fb      = s; }
+CALLBACK FUNCTION CB_Type(STRING s)         { Type_fb           = s; }
+
+PUSH Set_On    { myLight.SetOn();  }
+PUSH Set_Off   { myLight.SetOff(); }
+PUSH Get_State { myLight.GetState(); }
+PUSH SET_RGB   { myLight.SetRGB(R_In, G_In, B_In); }
+
+CHANGE Enable_Debug { myLight.SetDebug(Enable_Debug); }
+CHANGE Permanent_Resend_Enable { myLight.SetPermanentResend(Permanent_Resend_Enable); }
+CHANGE Enable_Raw_Json { myLight.SetRawJsonEnabled(Enable_Raw_Json); }
+
+THREADSAFE CHANGE Brightness_In { myLight.SetBrightness(Brightness_In); }
+
+THREADSAFE CHANGE Colortemp_In
+{
+  IF (Colortemp_In > 0) myLight.SetColortemp(Colortemp_In);
+}
+
+THREADSAFE CHANGE Hue_In { myLight.SetHue(Hue_In); }
+THREADSAFE CHANGE Sat_In { myLight.SetSat(Sat_In); }
+
+THREADSAFE CHANGE X_Coordinate
+{
+  sX = X_Coordinate;
+  IF (LEN(sX) > 0 && LEN(sY) > 0) { myLight.SetXY(sX, sY); sX = ""; sY = ""; }
+}
+THREADSAFE CHANGE Y_Coordinate
+{
+  sY = Y_Coordinate;
+  IF (LEN(sX) > 0 && LEN(sY) > 0) { myLight.SetXY(sX, sY); sX = ""; sY = ""; }
+}
+
+THREADSAFE CHANGE Effect_In
+{
+  IF (LEN(Effect_In) > 0) myLight.SetEffect(Effect_In);
+}
+
+Function Main()
+{
+  WaitForInitializationComplete();
+
+  sX = ""; sY = "";
+
+  RegisterDelegate(myLight, OnOnline,        CB_Online);
+  RegisterDelegate(myLight, OnOnFb,          CB_OnFb);
+  RegisterDelegate(myLight, OnOffFb,         CB_OffFb);
+  RegisterDelegate(myLight, OnBrightnessFb,  CB_BrightnessFb);
+  RegisterDelegate(myLight, OnColortempFb,   CB_ColortempFb);
+  RegisterDelegate(myLight, OnHueFb,         CB_HueFb);
+  RegisterDelegate(myLight, OnSatFb,         CB_SatFb);
+  RegisterDelegate(myLight, OnRFb,           CB_RFb);
+  RegisterDelegate(myLight, OnGFb,           CB_GFb);
+  RegisterDelegate(myLight, OnBFb,           CB_BFb);
+  RegisterDelegate(myLight, OnHasColor,      CB_HasColor);
+  RegisterDelegate(myLight, OnXFb,           CB_XFb);
+  RegisterDelegate(myLight, OnYFb,           CB_YFb);
+  RegisterDelegate(myLight, OnColormodeFb,   CB_ColormodeFb);
+  RegisterDelegate(myLight, OnEffectFb,      CB_EffectFb);
+  RegisterDelegate(myLight, OnDeviceIdFb,    CB_DeviceIdFb);
+  RegisterDelegate(myLight, OnRawJsonFb,     CB_RawJson);
+  RegisterDelegate(myLight, OnDebugOut,      CB_Debug);
+  RegisterDelegate(myLight, OnGroupsFb,      CB_Groups);
+  RegisterDelegate(myLight, OnLastAnnouncedFb, CB_LastAnnounced);
+  RegisterDelegate(myLight, OnLastSeenFb,    CB_LastSeen);
+  RegisterDelegate(myLight, OnManufacturerFb,CB_Manufacturer);
+  RegisterDelegate(myLight, OnModelIdFb,     CB_ModelId);
+  RegisterDelegate(myLight, OnNameFb,        CB_Name);
+  RegisterDelegate(myLight, OnSwVersionFb,   CB_SwVersion);
+  RegisterDelegate(myLight, OnTypeFb,        CB_Type);
+
+  myLight.SetOnlineTimeout(Online_Timeout_Seconds);
+  myLight.SetRawJsonEnabled(Enable_Raw_Json);
+  myLight.SetPermanentResend(Permanent_Resend_Enable);
+  myLight.Initialize(Device_UniqueID);
+  myLight.SetDebug(Enable_Debug);
+}
