@@ -52,18 +52,34 @@
 #HELP_BEGIN
   DeConz Light WS v4.1
   ------------------------------------------------------------------
-  Light control: commands via HTTP PUT, live feedback via WebSocket. The
-  device id/resource are auto-resolved from the first WS event. The API
-  key is set centrally on the Gateway.
+  Light control: commands via HTTP PUT/GET, live feedback via WebSocket.
+  Device id/resource auto-resolved from the first WS event. The API key is
+  set centrally on the Gateway. Colortemp is entered in Kelvin.
 
-  PARAMETERS  Device_UniqueID, Online_Timeout_Seconds
-  INPUTS   Set_On/Set_Off, Get_State, SET_RGB; Brightness/Colortemp/Hue/Sat_In,
-           R/G/B_In, X/Y_Coordinate, Effect_In; Enable_Debug/Raw_Json/Perm_Resend
-  OUTPUTS  online, On_fb/Off_fb, hascolor_fb; Brightness/Colortemp/Hue/Sat/R/G/B_fb;
-           X/Y/Colormode/Effect_fb; Groups_fb; device info (Manufacturer/ModelId/
-           Name/SwVersion/Type/LastSeen/LastAnnounced); device_id_fb, raw_json_out, Debug$
-  NOTES    Colortemp is entered in Kelvin (converted to mired). GetState fires
-           on connect/reconnect (random 1-15 s).
+  DIGITAL INPUTS
+    Set_On / Set_Off / Get_State / SET_RGB
+    Enable_Raw_Json / Enable_Debug / Permanent_Resend_Enable
+
+  ANALOG INPUTS
+    Brightness_In / Colortemp_In (Kelvin) / Hue_In / Sat_In / R_In / G_In / B_In
+
+  STRING INPUTS
+    X_Coordinate / Y_Coordinate / Effect_In
+
+  DIGITAL OUTPUTS
+    online / On_fb / Off_fb / hascolor_fb
+
+  ANALOG OUTPUTS
+    Brightness_fb / Colortemp_fb / Hue_fb / Sat_fb / R_fb / G_fb / B_fb
+
+  STRING OUTPUTS
+    X_fb / Y_fb / Colormode_fb / Effect_fb / device_id_fb / raw_json_out / Debug$
+    Groups_fb (e.g. "0,9,17,23") / LastAnnounced_fb / LastSeen_fb /
+    Manufacturer_fb / ModelId_fb / Name_fb / SwVersion_fb / Type_fb
+
+  PARAMETERS
+    Device_UniqueID
+    Online_Timeout_Seconds
 #HELP_END
 
 #USER_SIMPLSHARP_LIBRARY "DeConzZigbee"

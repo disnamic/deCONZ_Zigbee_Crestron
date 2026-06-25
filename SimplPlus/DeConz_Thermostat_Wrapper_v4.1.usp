@@ -75,20 +75,50 @@
 #HELP_BEGIN
   DeConz Thermostat v4.1
   ------------------------------------------------------------------
-  ZHAThermostat control + feedback. Commands target /sensors/<id>/config
-  (not state). The API key is set centrally on the Gateway.
+  ZHAThermostat control + feedback. Commands go via HTTP PUT to
+  /sensors/<id>/config (not state). The API key is set centrally on the
+  Gateway. Temperatures are deCONZ-native 1/100 C integers (2150 = 21.5 C).
 
-  PARAMETERS  Device_UniqueID, Battery_UniqueID (opt), Online_Timeout_Seconds
-  INPUTS   Thermostat_On/Off, Lock/Unlock, Window_Open_On/Off, Get_State,
-           Enable_Debug/Raw_Json/Perm_Resend; Heat_Setpoint, Cool_Setpoint
-           (1/100 C), Mode (0=off 1=auto 2=heat 3=cool), Offset (unsigned +1000)
-  OUTPUTS  online, on_fb/off_fb (config.on), heating_fb (state.on/valve),
-           lowbattery_fb, locked_fb, windowopen_set_fb; Temperature_fb,
-           Heat/Cool_Setpoint_fb (1/100 C, signed), Valve_fb (0-100%),
-           Battery_state, Voltage_fb, Offset_fb; *_str, Mode_fb, device info, raws
-  NOTES    Temperatures/setpoints are 1/100 C, signed (use _str for display).
-           Offset = actual + 1000 (950 = -0.5 C). config.on (enabled) is distinct
-           from heating_fb (currently heating).
+  DIGITAL INPUTS
+    Thermostat_On / Thermostat_Off    config.on true/false
+    Lock / Unlock                     config.locked true/false
+    Window_Open_On / Window_Open_Off  config.windowopen_set true/false
+    Get_State                         HTTP GET full device state
+    Enable_Raw_Json / Enable_Debug / Permanent_Resend_Enable
+
+  ANALOG INPUTS
+    Heat_Setpoint            1/100 C (2150 = 21.5 C)
+    Cool_Setpoint            1/100 C
+    Mode                     0=off 1=auto 2=heat 3=cool
+    Offset                   signed offset + 1000 bias (0-2000; 950 = -0.5 C)
+
+  DIGITAL OUTPUTS
+    online                   1 = WS alive
+    on_fb / off_fb           thermostat enabled/disabled (config.on)
+    heating_fb               currently heating (state.on / valve > 0)
+    lowbattery_fb            1 = low battery
+    locked_fb                1 = keypad locked
+    windowopen_set_fb        1 = window-open detection active
+
+  ANALOG OUTPUTS
+    Temperature_fb           measured temp 1/100 C, SIGNED (65036 = -5.0 C)
+    Heat_Setpoint_fb / Cool_Setpoint_fb   1/100 C
+    Valve_fb                 valve position 0-100 %
+    Battery_state            0-100 %
+    Voltage_fb               battery mV (ZHABattery, if available)
+    Offset_fb                signed offset + 1000 bias
+
+  STRING OUTPUTS
+    Temperature_str / Heat_Setpoint_str / Cool_Setpoint_str   "21.5"
+    Offset_str               "+0.5" / "-1.0"
+    Mode_fb                  "heat" / "cool" / "auto" / "off"
+    device_id_fb / LastSeen_fb / LastAnnounced_fb / Manufacturer_fb /
+    ModelId_fb / Name_fb / Type_fb / battery_raw_json / raw_json_out / Debug$
+
+  PARAMETERS
+    Device_UniqueID          thermostat endpoint uniqueid
+    Battery_UniqueID         ZHABattery endpoint uniqueid (optional)
+    Online_Timeout_Seconds   default 120
 #HELP_END
 
 #USER_SIMPLSHARP_LIBRARY "DeConzZigbee"

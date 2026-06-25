@@ -48,18 +48,41 @@
 #HELP_BEGIN
   DeConz Power v4.1
   ------------------------------------------------------------------
-  Smart plug / power meter: switch + ZHAPower + ZHAConsumption, all three
-  endpoints optional. The API key is set centrally on the Gateway.
+  Zigbee smart plug / power meter with on/off control. Three optional
+  endpoints: switch (on/off), power (ZHAPower) and consumption
+  (ZHAConsumption). The API key is set centrally on the Gateway.
+
+  DIGITAL INPUTS
+    Set_On / Set_Off         switch commands
+    Get_State                HTTP GET all active endpoints
+    Enable_Raw_Json          High -> raw JSON active
+    Enable_Debug             High -> debug on Debug$
+    Permanent_Resend_Enable  High -> re-assert cached strings
+
+  DIGITAL OUTPUTS
+    online / on_fb / off_fb / battery_low
+
+  ANALOG OUTPUTS
+    Power_fb                 W
+    Voltage_fb               V
+    Current_fb               A
+    Consumption_fb           Wh (divide by 1000 for kWh)
+    Consumption_Power_fb     W (from consumption endpoint)
+    Battery_state            0-100 %
+
+  STRING OUTPUTS
+    LastSeen_fb / LastAnnounced_fb / Manufacturer_fb / ModelId_fb / Name_fb
+    switch_raw_json / power_raw_json / consumption_raw_json / Debug$
 
   PARAMETERS
-    Switch_UniqueID / Power_UniqueID / Consumption_UniqueID  (all optional)
-    Online_Timeout_Seconds  default 120
-  INPUTS   Set_On/Set_Off, Get_State; Enable_Raw_Json/Debug/Perm_Resend
-  OUTPUTS  online, on_fb/off_fb, battery_low; Power_fb (W), Voltage_fb (V),
-           Current_fb (A), Consumption_fb (Wh), Consumption_Power_fb (W),
-           Battery_state; device info; raws, Debug$
-  NOTES    Consumption_fb is Wh → divide by 1000 for kWh. The meter cannot be
-           reset via the API; implement a SIMPL+ offset.
+    Switch_UniqueID          on/off light endpoint uniqueid (optional)
+    Power_UniqueID           ZHAPower uniqueid              (optional)
+    Consumption_UniqueID     ZHAConsumption uniqueid        (optional)
+    Online_Timeout_Seconds   default 120
+
+  NOTES
+    Consumption_fb is a hardware counter (Wh) that cannot be reset via the
+    deCONZ API; implement a software offset in SIMPL+ for a reset.
 #HELP_END
 
 #USER_SIMPLSHARP_LIBRARY "DeConzZigbee"

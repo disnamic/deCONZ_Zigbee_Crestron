@@ -49,17 +49,36 @@
 #HELP_BEGIN
   DeConz Scene v4.1
   ------------------------------------------------------------------
-  Recall and store deCONZ scenes within a group via HTTP. Group and scene
-  are set at runtime; this module has no parameters. The API key is set
-  centrally on the Gateway.
+  Recalls and stores deCONZ scenes within a group via HTTP. Group ID and
+  Scene ID are set at runtime via analog inputs; this module has no
+  parameters. The API key is set centrally on the Gateway.
 
-  PARAMETERS  none (Group_ID / Scene_ID are analog inputs)
-  INPUTS   Recall_Scene, Store_Scene, Get_Scenes, Enable_Raw_Json/Debug/
-           Perm_Resend; Group_ID, Scene_ID (analog, > 0)
-  OUTPUTS  Recall_Success_fb / Store_Success_fb (pulses), Last_Recalled_Group_fb,
-           Last_Recalled_Scene_fb, scenes_list_fb ("id:name,id:name"),
-           raw_json_out, Debug$
-  NOTES    Unreachable (powered-off) lights are not affected by Recall_Scene.
+  DIGITAL INPUTS
+    Recall_Scene     Pulse -> recall scene S in group G
+    Store_Scene      Pulse -> store current light states into scene S
+    Get_Scenes       Pulse -> list scenes of group G
+    Enable_Raw_Json / Enable_Debug / Permanent_Resend_Enable
+
+  ANALOG INPUTS
+    Group_ID         target group (required, > 0)
+    Scene_ID         target scene (required, > 0)
+
+  DIGITAL OUTPUTS
+    Recall_Success_fb / Store_Success_fb     200 ms pulse on success
+
+  ANALOG OUTPUTS
+    Last_Recalled_Group_fb / Last_Recalled_Scene_fb
+
+  STRING OUTPUTS
+    scenes_list_fb   "1:warmlight,2:reading" from Get_Scenes
+    raw_json_out     HTTP response (when Enable_Raw_Json high)
+    Debug$
+
+  PARAMETERS
+    none (Group_ID / Scene_ID are analog inputs)
+
+  NOTES
+    Unreachable (powered-off) lights are not affected by Recall_Scene.
 #HELP_END
 
 #USER_SIMPLSHARP_LIBRARY "DeConzZigbee"

@@ -58,19 +58,44 @@
 #HELP_BEGIN
   DeConz Shade v4.1
   ------------------------------------------------------------------
-  Window covering (shade / blind / drape). Commands via HTTP PUT,
-  feedback via WebSocket. The API key is set centrally on the Gateway.
+  Zigbee window covering (shade / blind / drape). Commands via HTTP PUT,
+  feedback via WebSocket; device id/resource auto-resolved. The API key is
+  set centrally on the Gateway.
+
+  DIGITAL INPUTS
+    Move_up          Pulse -> open (fully open)
+    Move_down        Pulse -> close (fully closed)
+    Stop             Pulse -> stop
+    Get_State        Pulse -> HTTP GET
+    Enable_Raw_Json / Enable_Debug / Permanent_Resend_Enable
+
+  ANALOG INPUTS
+    Lift_percentage  0-100 (absolute position)
+    Tilt_percentage  0-100 (venetian blinds)
+
+  DIGITAL OUTPUTS
+    online / lowbattery_fb / open_fb / closed_fb / moving_fb
+
+  ANALOG OUTPUTS
+    Battery_state            0-100 %
+    Lift_percentage_fb       0-100 (per Invert_Lift)
+    Tilt_percentage_fb       0-100 (per Invert_Lift)
+
+  STRING OUTPUTS
+    device_id_fb / LastSeen_fb / LastAnnounced_fb / Manufacturer_fb /
+    ModelId_fb / Name_fb / Type_fb / raw_json_out / Debug$
 
   PARAMETERS
-    Device_UniqueID, Battery_UniqueID (opt), Invert_Lift (0/1),
-    Open_Threshold (default 1), Closed_Threshold (default 99),
-    Online_Timeout_Seconds
-  INPUTS   Move_up, Move_down, Stop, Get_State, Enable_Debug/Raw_Json/Perm_Resend;
-           Lift_percentage (0-100), Tilt_percentage (0-100, venetian)
-  OUTPUTS  online, lowbattery_fb, open_fb, closed_fb, moving_fb; Battery_state,
-           Lift_percentage_fb, Tilt_percentage_fb; device info, raw_json_out, Debug$
-  NOTES    deCONZ lift is 0=open / 100=closed; set Invert_Lift=1 to mirror command
-           and feedback. moving_fb is heuristic. GetState on connect (1-15 s).
+    Device_UniqueID          shade endpoint uniqueid
+    Battery_UniqueID         ZHABattery uniqueid (optional)
+    Invert_Lift              0 = native (0 open), 1 = inverted (0 closed)
+    Open_Threshold           lift % at which open_fb = 1 (default 1)
+    Closed_Threshold         lift % at which closed_fb = 1 (default 99)
+    Online_Timeout_Seconds   default 120
+
+  NOTES
+    deCONZ lift is 0=open / 100=closed; Invert_Lift=1 mirrors command and
+    feedback. moving_fb is heuristic.
 #HELP_END
 
 #USER_SIMPLSHARP_LIBRARY "DeConzZigbee"

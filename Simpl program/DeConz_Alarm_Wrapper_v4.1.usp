@@ -39,17 +39,34 @@
 #HELP_BEGIN
   DeConz Alarm v4.1
   ------------------------------------------------------------------
-  Alarm / fire / CO safety sensors: ZHAAlarm + ZHAFire +
-  ZHACarbonMonoxide as three optional endpoints (combine as needed).
-  The API key is set centrally on the Gateway.
+  Zigbee alarm / safety sensor module: ZHAAlarm, ZHAFire and
+  ZHACarbonMonoxide as three optional endpoints (single-type detectors or
+  combination devices). The API key is set centrally on the Gateway.
+
+  DIGITAL INPUTS
+    Get_State / Enable_Raw_Json / Enable_Debug / Permanent_Resend_Enable
+
+  DIGITAL OUTPUTS
+    online / alarm_fb / fire_fb / carbonmonoxide_fb
+    tampered_fb / battery_low
+
+  ANALOG OUTPUTS
+    Battery_state            0-100 %
+    Voltage_fb               mV
+
+  STRING OUTPUTS
+    LastSeen_fb / LastAnnounced_fb / Manufacturer_fb / ModelId_fb / Name_fb
+    alarm_raw_json / fire_raw_json / co_raw_json / battery_raw_json / Debug$
 
   PARAMETERS
-    Alarm_UniqueID / Fire_UniqueID / CO_UniqueID / Battery_UniqueID (all opt.)
-    Online_Timeout_Seconds  default 120
-  INPUTS   Get_State; Enable_Raw_Json/Debug/Perm_Resend
-  OUTPUTS  online, alarm_fb, fire_fb, carbonmonoxide_fb, tampered_fb, battery_low;
-           Battery_state, Voltage_fb; device info; raws, Debug$
-  NOTES    tampered_fb and battery are shared across the active endpoints.
+    Alarm_UniqueID           ZHAAlarm uniqueid            (optional)
+    Fire_UniqueID            ZHAFire uniqueid             (optional)
+    CO_UniqueID              ZHACarbonMonoxide uniqueid   (optional)
+    Battery_UniqueID         ZHABattery uniqueid          (optional)
+    Online_Timeout_Seconds   default 120
+
+  NOTES
+    tampered_fb and battery are shared across the active endpoints.
 #HELP_END
 
 #USER_SIMPLSHARP_LIBRARY "DeConzZigbee"

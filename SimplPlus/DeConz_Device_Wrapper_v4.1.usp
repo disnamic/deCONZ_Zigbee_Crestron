@@ -39,18 +39,24 @@
   Generic raw-JSON passthrough: one primary plus up to 5 optional Zigbee
   endpoints, each on its own output. No parsing. Feedback via the broker
   (no wiring to the Gateway). The API key is set centrally on the Gateway.
+  Use it for a multi-endpoint device, raw JSON from several devices, or as
+  a catch-all before building a dedicated typed module.
+
+  OUTPUTS
+    raw_json_out      payload from Device_UniqueID (primary, always active)
+    raw_json_all      all payloads from all active UIDs combined
+    raw_json_out_2    payload from UniqueID_2 (active if its parameter is set)
+    raw_json_out_3    payload from UniqueID_3
+    raw_json_out_4    payload from UniqueID_4
+    raw_json_out_5    payload from UniqueID_5
+    raw_json_out_6    payload from UniqueID_6
 
   PARAMETERS
     Device_UniqueID   primary uniqueid (required)
-    UniqueID_2 … 6    optional extra uniqueids (empty = slot disabled)
-
-  OUTPUTS
-    raw_json_out      payload of Device_UniqueID
-    raw_json_out_2…6  payload of each extra UID (active when its param is set)
-    raw_json_all      all active payloads combined
+    UniqueID_2..6     additional uniqueids (optional; empty disables the slot)
 
   NOTES
-    uniqueid: Phoscon (http://<gateway-ip>/pwa/) → Lights/Sensors → Advanced.
+    uniqueid: Phoscon (http://<gateway-ip>/pwa/) -> Lights/Sensors -> Advanced.
 #HELP_END
 
 #USER_SIMPLSHARP_LIBRARY "DeConzZigbee"

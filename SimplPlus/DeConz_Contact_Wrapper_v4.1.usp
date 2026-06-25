@@ -49,17 +49,34 @@
 #HELP_BEGIN
   DeConz Contact v4.1
   ------------------------------------------------------------------
-  Door/window contact sensor (ZHAOpenClose). Feedback via WebSocket plus
-  HTTP GET. The API key is set centrally on the Gateway.
+  Zigbee door/window contact sensor (ZHAOpenClose). Feedback via
+  WebSocket plus HTTP GET. The API key is set centrally on the Gateway.
+  State is polled on connect/reconnect (random 1-15 s) and every 30 min.
+
+  DIGITAL INPUTS
+    Get_State                Pulse -> HTTP GET
+    Enable_Raw_Json          High  -> raw JSON outputs active
+    Enable_Debug             High  -> debug on Debug$
+    Permanent_Resend_Enable  High  -> re-assert cached strings
+
+  DIGITAL OUTPUTS
+    online                   1 = WS alive
+    open_fb                  1 = contact open
+    closed_fb                1 = contact closed
+    battery_low              1 = low battery
+
+  ANALOG OUTPUTS
+    Battery_state            0-100 %
+    Voltage_fb               mV (ZHABattery, if configured)
+
+  STRING OUTPUTS
+    device_id_fb / LastSeen_fb / LastAnnounced_fb / Manufacturer_fb /
+    ModelId_fb / Name_fb / Type_fb / raw_json_out / battery_raw_json / Debug$
 
   PARAMETERS
-    Device_UniqueID         ZHAOpenClose uniqueid
-    Battery_UniqueID        optional ZHABattery uniqueid (empty if on sensor)
-    Online_Timeout_Seconds  default 120
-  INPUTS   Get_State (pulse → HTTP GET); Enable_Debug/Raw_Json/Perm_Resend
-  OUTPUTS  online, open_fb, closed_fb, battery_low; Battery_state (0-100%),
-           Voltage_fb; device info; raw_json_out, battery_raw_json, Debug$
-  NOTES    State polled on connect/reconnect (random 1-15 s) and every 30 min.
+    Device_UniqueID          ZHAOpenClose sensor uniqueid
+    Battery_UniqueID         ZHABattery uniqueid (optional; empty if on sensor)
+    Online_Timeout_Seconds   default 120
 #HELP_END
 
 #USER_SIMPLSHARP_LIBRARY "DeConzZigbee"

@@ -77,20 +77,44 @@
 #HELP_BEGIN
   DeConz Group Control v4.1
   ------------------------------------------------------------------
-  Controls 1-4 deCONZ light groups at once via HTTP, plus group create /
-  rename / members / delete and scene listing. Groups are set at runtime;
-  this module has no parameters. The API key is set centrally on the Gateway.
+  Controls 1-4 deCONZ light groups at once via HTTP, plus group
+  create/rename/members/delete and scene listing. Group IDs are set at
+  runtime via analog inputs; this module has no parameters. The API key is
+  set centrally on the Gateway. Feedback is read from the primary group.
 
-  PARAMETERS  none (Group_ID/_2/_3/_4 are analog inputs; 0 = disabled)
-  INPUTS   Set_On/Off, Toggle, Get_State, Delete/Create_Group, Set_Name,
-           Set_Members, Get_All_Groups, Alert_*, Effect_*, Enable_Raw_Json/Debug/
-           Perm_Resend; Group_ID(_2-4), Brightness, Colortemp (K), Hue, Sat,
-           Transitiontime (1/10 s); New_Group_Name, Members_In
-  OUTPUTS  all_on_fb, any_on_fb, Delete/Create/Set_Attr_success_fb, New_Group_Id_fb;
-           Brightness_fb, Colortemp_fb (K); Colormode_fb, group_name_fb, members_fb,
-           scenes_fb, raw_json_out, Debug$
-  NOTES    State feedback is read from the primary group (Group_ID) only.
-           Transitiontime applies to the next brightness/colour command.
+  DIGITAL INPUTS
+    Set_On / Set_Off / Toggle
+    Get_State, Delete_Group, Create_Group, Set_Name, Set_Members,
+    Get_All_Groups
+    Alert_Select / Alert_Long / Alert_None
+    Effect_Colorloop / Effect_None
+    Enable_Raw_Json / Enable_Debug / Permanent_Resend_Enable
+
+  ANALOG INPUTS
+    Group_ID (primary, 0=none), Group_ID_2/3/4 (optional, 0=disabled)
+    Brightness_In (0-254), Colortemp_In (Kelvin), Hue_In (0-65535),
+    Sat_In (0-254), Transitiontime (1/10 s, 0=immediate)
+
+  STRING INPUTS
+    New_Group_Name, Members_In (e.g. "3,42,43")
+
+  DIGITAL OUTPUTS
+    all_on_fb / any_on_fb
+    Delete_success_fb / Create_success_fb / Set_Attr_success_fb  (200 ms pulse)
+    New_Group_Id_fb
+
+  ANALOG OUTPUTS
+    Brightness_fb (0-254), Colortemp_fb (Kelvin)
+
+  STRING OUTPUTS
+    Colormode_fb ("hs"/"xy"/"ct"), group_name_fb, members_fb, scenes_fb,
+    raw_json_out, Debug$
+
+  PARAMETERS
+    none (Group_ID/_2/_3/_4 are analog inputs; 0 disables a slot)
+
+  NOTES
+    Transitiontime applies to the next brightness/colour command.
 #HELP_END
 
 #USER_SIMPLSHARP_LIBRARY "DeConzZigbee"

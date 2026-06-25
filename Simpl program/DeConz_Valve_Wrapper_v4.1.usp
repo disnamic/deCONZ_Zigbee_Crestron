@@ -65,22 +65,34 @@
 #HELP_BEGIN
   DeConz Valve v4.1
   ------------------------------------------------------------------
-  Irrigation valve in one symbol: an On/Off valve endpoint (resource
-  "lights") plus a ZHAWater sensor endpoint (water / battery / flow).
-  Device ids/resources auto-resolve from the first WS event. The API key
-  is set centrally on the Gateway.
+  Zigbee irrigation valve in one symbol: an On/Off valve endpoint
+  (resource "lights") plus a ZHAWater sensor endpoint (water, battery,
+  flow). Device ids/resources auto-resolve from the first WS event. The
+  API key is set centrally on the Gateway.
+
+  DIGITAL INPUTS
+    Open_Valve       Pulse -> on (valve open)
+    Close_Valve      Pulse -> off (valve closed)
+    Get_State        Pulse -> HTTP GET both endpoints
+    Enable_Raw_Json / Enable_Debug / Permanent_Resend_Enable
+
+  DIGITAL OUTPUTS
+    online / valve_on_fb / valve_off_fb / water_detected / battery_low
+
+  ANALOG OUTPUTS
+    battery_level            0-100 %
+
+  STRING OUTPUTS
+    flow_volume_fb           raw flow value (device-specific unit)
+    valve_id_fb / sensor_id_fb   resolved deCONZ device IDs
+    LastAnnounced_fb / LastSeen_fb / Manufacturer_fb / ModelId_fb / Name_fb /
+    Type_fb / valve_raw_json / sensor_raw_json / Debug$
 
   PARAMETERS
-    Valve_UniqueID          On/Off valve endpoint uniqueid
-    Sensor_UniqueID         ZHAWater sensor endpoint uniqueid
-    Flow_Key                JSON key for the flow value (default "flow")
-    Online_Timeout_Seconds  default 120
-  INPUTS   Open_Valve, Close_Valve, Get_State, Enable_Debug/Raw_Json/Perm_Resend
-  OUTPUTS  online, valve_on_fb, valve_off_fb, water_detected, battery_low;
-           battery_level (0-100%); flow_volume_fb, valve_id_fb, sensor_id_fb,
-           device info; valve_raw_json, sensor_raw_json, Debug$
-  NOTES    Only the two uniqueids (and Flow_Key) need configuring; the API key
-           is entered once on the Gateway. GetState on connect (random 1-15 s).
+    Valve_UniqueID           On/Off valve endpoint uniqueid
+    Sensor_UniqueID          ZHAWater sensor endpoint uniqueid
+    Flow_Key                 JSON key for the flow value (default "flow")
+    Online_Timeout_Seconds   default 120
 #HELP_END
 
 #USER_SIMPLSHARP_LIBRARY "DeConzZigbee"
