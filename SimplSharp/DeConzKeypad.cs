@@ -63,7 +63,7 @@ namespace DeConzZigbee
 
         // ── Private state ─────────────────────────────────────────────────
         private string _uniqueId;
-        private string _apiKey;
+        private string _apiKey { get { return DeConzBroker.ApiKey ?? ""; } }
         private string _deviceId;    // resolved from first WS frame
         private string _resource;    // resolved from first WS frame
         private string _baseUrl;
@@ -93,7 +93,7 @@ namespace DeConzZigbee
         /// <summary>
         /// Call from SIMPL+ Main() after all RegisterDelegate calls.
         /// </summary>
-        public void Initialize(string uniqueId, string apiKey,
+        public void Initialize(string uniqueId,
                                int numberOfButtons, int onlineTimeoutSeconds)
         {
             if (string.IsNullOrEmpty(uniqueId))
@@ -103,7 +103,6 @@ namespace DeConzZigbee
             }
 
             _uniqueId        = uniqueId.Trim().ToLowerInvariant();
-            _apiKey          = apiKey ?? "";
             _numberOfButtons = Math.Max(1, Math.Min(MaxButtons, numberOfButtons));
             _onlineTimeoutMs = Math.Max(5000, onlineTimeoutSeconds * 1000);
             _initialized     = true;
@@ -122,6 +121,8 @@ namespace DeConzZigbee
                 _uniqueId, _numberOfButtons, _onlineTimeoutMs / 1000));
 
             _staleTimer = new CTimer(_ => CheckStale(), null, 300000, 300000);
+            _permRun = true;
+            ArmPermTimer();
         }
 
         public void SetRawJsonEnabled(ushort enable) { _rawJsonEnabled = (enable != 0); }
@@ -129,6 +130,7 @@ namespace DeConzZigbee
 
         public void Dispose()
         {
+            _permRun = false;
             if (_staleTimer != null) { _staleTimer.Stop(); _staleTimer = null; }
             if (!_initialized) return;
             DeConzBroker.UnregisterDevice(_uniqueId, OnWsUpdate);
@@ -148,6 +150,7 @@ namespace DeConzZigbee
                 DebugLog("[Keypad:" + _uniqueId + "] GetState deferred – URL not yet known");
                 return;
             }
+            _staticInfoSent = false;   // re-send static device info on manual refresh
             DebugLog("[Keypad:" + _uniqueId + "] GET " + url);
             try
             {
@@ -446,10 +449,56 @@ namespace DeConzZigbee
         }
         // ── Helpers ───────────────────────────────────────────────────────
 
-        private static void FireStr(KeypadStringDelegate cb, string s)
+        // ── Permanent string re-assert (Make-String-Permanent equivalent) ──
+        // Periodically re-fire the cached string outputs while the global or
+        // this module's local enable is high, so late joining sinks always see
+        // the current values. Debug and raw JSON do not use FireStr here, so
+        // every FireStr value is a cacheable (non-raw, non-debug) string.
+        private readonly System.Collections.Generic.Dictionary<object, string> _lastStr
+            = new System.Collections.Generic.Dictionary<object, string>();
+        private readonly CCriticalSection _strLock = new CCriticalSection();
+        private bool _permLocal;
+        private bool _permRun;
+
+        public void SetPermanentResend(ushort e) { _permLocal = (e != 0); }
+
+        private void ArmPermTimer()
+        {
+            int ms = DeConzBroker.PermanentResendMs;
+            if (ms < 1000) ms = 30000;
+            CTimer t = null;
+            t = new CTimer(_ =>
+            {
+                if (DeConzBroker.GlobalPermanentResend || _permLocal) ReassertStrings();
+                if (t != null) t.Dispose();
+                if (_permRun) ArmPermTimer();
+            }, null, ms);
+        }
+
+        private void ReassertStrings()
+        {
+            System.Collections.Generic.KeyValuePair<object, string>[] snap;
+            _strLock.Enter();
+            try
+            {
+                snap = new System.Collections.Generic.KeyValuePair<object, string>[_lastStr.Count];
+                ((System.Collections.Generic.ICollection<System.Collections.Generic.KeyValuePair<object, string>>)_lastStr).CopyTo(snap, 0);
+            }
+            finally { _strLock.Leave(); }
+            for (int i = 0; i < snap.Length; i++)
+            {
+                var cb = snap[i].Key as KeypadStringDelegate;
+                if (cb != null) try { cb(new SimplSharpString(snap[i].Value)); } catch { }
+            }
+        }
+
+        private void FireStr(KeypadStringDelegate cb, string s)
         {
             if (cb == null || s == null) return;
             if (s.Length > 250) s = s.Substring(0, 250);
+            _strLock.Enter();
+            try { _lastStr[cb] = s; }
+            finally { _strLock.Leave(); }
             try { cb(new SimplSharpString(s)); } catch { }
         }
 

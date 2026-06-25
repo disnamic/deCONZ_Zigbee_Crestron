@@ -1,0 +1,201 @@
+[BEGIN]
+  Version=1
+[END]
+[BEGIN]
+  ObjTp=FSgntr
+  Sgntr=UserSPlus
+  RelVrs=1
+  IntStrVrs=1
+  SPlusVrs=4.06.00
+  CrossCplrVrs=1.3
+[END]
+[BEGIN]
+  ObjTp=Hd
+  Cmn1=||2DeConz Power v4.1\\  ------------------\\  Smart plug / power||1
+  Cmn2=meter. All three endpoints are optional.\\  Switch_UniqueID: the||1
+  Cmn3=on/off endpoint (appears as a light in deCONZ).\\  Power_UniqueID:
+  Cmn4=||1ZHAPower for real-time W, V, A readings.\\  Consumption_UniqueID:
+  Cmn5=||1ZHAConsumption for cumulative Wh + current power.\\  Consumption_fb||1
+  Cmn6=is in Wh. Divide by 1000 in SIMPL+ logic for kWh display.
+[END]
+[BEGIN]
+  ObjTp=Symbol
+  Exclusions=1,19,20,21,88,89,167,168,179,213,214,215,216,217,225,226,248,249,266,267,310,362,378,380,405,407,408,409,478,522,537,554,586,590,611,624,718,756,767,830,841,842,854,883,955,1032,1062,1079,1128,1129,1134,1140,1157,1158,1195,1199,1220,1221,1222,1223,1299,1348,1349,1439,1472,1473,1499,1746,1766,1803,1975,2229,2354,2514,2523,2532,2567,2574,2590,2651,2655,2706,2707,2817,2886,2938,2947,3181,3197,3233,3235,3236,3427,3454,3567,3568,3601,3602,3680,3682,3706,3708,3710,3735,3736,3816,3888,3902,3903,3912,3918,3925,3926,4176,4193,4206,4207,4308,4476,4591,4769,5360,5388,5420,5455,5497,5699,5813,5919,6150,6161,
+  Exclusions_CDS=5,6
+  Inclusions_CDS=7
+  Name=DeConz_Power v4.1
+  SmplCName=DeConz_Power_Wrapper_v4.1.usp
+  Code=1
+  SysRev5=4.000
+  SMWRev=3.00.00
+  InputCue1=[~UNUSED~]
+  InputSigType1=Digital
+  InputCue2=[~UNUSED~]
+  InputSigType2=Digital
+  InputCue3=[~UNUSED~]
+  InputSigType3=Digital
+  InputCue4=[~UNUSED~]
+  InputSigType4=Digital
+  InputCue5=Set_On
+  InputSigType5=Digital
+  InputCue6=Set_Off
+  InputSigType6=Digital
+  InputCue7=[~UNUSED~]
+  InputSigType7=Digital
+  InputCue8=Get_State
+  InputSigType8=Digital
+  InputCue9=Enable_Raw_Json
+  InputSigType9=Digital
+  InputCue10=Enable_Debug
+  InputSigType10=Digital
+  InputCue11=Permanent_Resend_Enable
+  InputSigType11=Digital
+  OutputCue1=[~UNUSED~]
+  OutputSigType1=Digital
+  OutputCue2=[~UNUSED~]
+  OutputSigType2=Digital
+  OutputCue3=[~UNUSED~]
+  OutputSigType3=Digital
+  OutputCue4=[~UNUSED~]
+  OutputSigType4=Digital
+  OutputCue5=online
+  OutputSigType5=Digital
+  OutputCue6=on_fb
+  OutputSigType6=Digital
+  OutputCue7=off_fb
+  OutputSigType7=Digital
+  OutputCue8=battery_low
+  OutputSigType8=Digital
+  OutputList2Cue1=Power_fb
+  OutputList2SigType1=Analog
+  OutputList2Cue2=Voltage_fb
+  OutputList2SigType2=Analog
+  OutputList2Cue3=Current_fb
+  OutputList2SigType3=Analog
+  OutputList2Cue4=Consumption_fb
+  OutputList2SigType4=Analog
+  OutputList2Cue5=Consumption_Power_fb
+  OutputList2SigType5=Analog
+  OutputList2Cue6=Battery_state
+  OutputList2SigType6=Analog
+  OutputList2Cue7=LastSeen_fb
+  OutputList2SigType7=Serial
+  OutputList2Cue8=LastAnnounced_fb
+  OutputList2SigType8=Serial
+  OutputList2Cue9=Manufacturer_fb
+  OutputList2SigType9=Serial
+  OutputList2Cue10=ModelId_fb
+  OutputList2SigType10=Serial
+  OutputList2Cue11=Name_fb
+  OutputList2SigType11=Serial
+  OutputList2Cue12=[~UNUSED~]
+  OutputList2SigType12=Serial
+  OutputList2Cue13=switch_raw_json
+  OutputList2SigType13=Serial
+  OutputList2Cue14=power_raw_json
+  OutputList2SigType14=Serial
+  OutputList2Cue15=consumption_raw_json
+  OutputList2SigType15=Serial
+  OutputList2Cue16=Debug$
+  OutputList2SigType16=Serial
+  ParamCue1=[Reference Name]
+  ParamCue2=Switch_UniqueID
+  ParamSigType2=String
+  ParamCue3=Power_UniqueID
+  ParamSigType3=String
+  ParamCue4=Consumption_UniqueID
+  ParamSigType4=String
+  ParamCue5=Online_Timeout_Seconds
+  ParamSigType5=Constant
+  MinVariableInputs=11
+  MaxVariableInputs=11
+  MinVariableInputsList2=0
+  MaxVariableInputsList2=0
+  MinVariableOutputs=8
+  MaxVariableOutputs=8
+  MinVariableOutputsList2=16
+  MaxVariableOutputsList2=16
+  MinVariableParams=4
+  MaxVariableParams=4
+  Expand=expand_separately
+  Expand2=expand_separately
+  ProgramTree=Logic
+  SymbolTree=46
+  UserSymTreeName=DeConZ_Zigbee
+  Hint=
+  PdfHelp=
+  HelpID= 
+  Render=4
+  Smpl-C=16
+  CompilerCode=-48
+  CompilerParamCode=27
+  CompilerParamCode5=14
+  NumFixedParams=1
+  Pp1=1
+  Pp2=2
+  Pp3=3
+  Pp4=4
+  Pp5=5
+  MPp=5
+  NVStorage=10
+  ParamSigType1=String
+  SmplCInputCue1=o#
+  SmplCOutputCue1=i#
+  SmplCInputList2Cue1=an#
+  SmplCOutputList2Cue1=ai#
+  SPlus2CompiledName=S2_DeConz_Power_Wrapper_v4_1
+  SymJam=NonExclusive
+  FileName=DeConz_Power_Wrapper_v4.1.ush
+  SIMPLPlusModuleEncoding=0
+  clz1=DeConzZigbee
+[END]
+[BEGIN]
+  ObjTp=Dp
+  H=1
+  Tp=1
+  NoS=False
+[END]
+[BEGIN]
+  ObjTp=Dp
+  H=2
+  Tp=1
+  SD=On/Off switch endpoint uniqueid (optional)
+  HD=True
+  DV=
+  NoS=False
+  VVS=0
+[END]
+[BEGIN]
+  ObjTp=Dp
+  H=3
+  Tp=1
+  SD=ZHAPower sensor uniqueid (optional)
+  HD=True
+  DV=
+  NoS=False
+  VVS=0
+[END]
+[BEGIN]
+  ObjTp=Dp
+  H=4
+  Tp=1
+  SD=ZHAConsumption sensor uniqueid (optional)
+  HD=True
+  DV=
+  NoS=False
+  VVS=0
+[END]
+[BEGIN]
+  ObjTp=Dp
+  H=5
+  Tp=1
+  SD=Seconds without WS traffic until online=0 (default 120)
+  HD=True
+  DV=120d
+  Sgn=0
+  Lng=False
+  NF=1
+  NoS=True
+  DNF=1
+  VVS=0
+[END]

@@ -39,3 +39,9 @@ HANDOVER.md
 # overriding the build-artifact filters above (.clz/.ush/.lpz/.sig/...).
 !Simpl program/
 !Simpl program/**
+
+# ...but keep SIMPL Windows intermediates and autosaves out of the deliverable.
+Simpl program/SPlsWork/
+Simpl program/*.ASV
+Simpl program/*.sm2
+Simpl program/*_archive.zip

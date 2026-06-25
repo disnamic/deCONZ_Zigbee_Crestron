@@ -52,6 +52,7 @@ namespace DeConzZigbee
 
         // Device info
         public PowerStringDelegate OnLastSeenFb      { get; set; }
+        public PowerStringDelegate OnLastAnnouncedFb { get; set; }
         public PowerStringDelegate OnManufacturerFb  { get; set; }
         public PowerStringDelegate OnModelIdFb       { get; set; }
         public PowerStringDelegate OnNameFb          { get; set; }
@@ -63,7 +64,7 @@ namespace DeConzZigbee
         public PowerStringDelegate OnDebugOut            { get; set; }
 
         // ── Private state ─────────────────────────────────────────────────
-        private string _apiKey;
+        private string _apiKey { get { return DeConzBroker.ApiKey ?? ""; } }
         private bool   _debugEnabled;
         private bool   _rawJsonEnabled;
         private bool   _initialized;
@@ -96,6 +97,13 @@ namespace DeConzZigbee
         private DateTime _lastActivityUtc = DateTime.UtcNow;
         private bool     _staleResetDone;
 
+        // ── Permanent string re-assert (Make-String-Permanent equivalent) ──
+        private readonly System.Collections.Generic.Dictionary<object, string> _lastStr
+            = new System.Collections.Generic.Dictionary<object, string>();
+        private readonly CCriticalSection _strLock = new CCriticalSection();
+        private bool _permLocal;
+        private bool _permRun;
+
         private readonly HttpClient       _http    = new HttpClient();
         private readonly CCriticalSection _cmdLock = new CCriticalSection();
 
@@ -105,9 +113,8 @@ namespace DeConzZigbee
         // ── Public API ────────────────────────────────────────────────────
 
         public void Initialize(string switchUid, string powerUid,
-                               string consumptionUid, string apiKey)
+                               string consumptionUid)
         {
-            _apiKey      = apiKey ?? "";
             _initialized = true;
             _http.TimeoutEnabled = true;
             _http.Timeout        = 10;
@@ -134,6 +141,8 @@ namespace DeConzZigbee
                 _switchUid ?? "(none)", _powerUid ?? "(none)", _consUid ?? "(none)"));
 
             _staleTimer = new CTimer(_ => CheckStale(), null, 300000, 300000);
+            _permRun = true;
+            ArmPermTimer();
         }
 
         public void SetOnlineTimeout(int seconds) { _onlineTimeoutMs = Math.Max(5, seconds) * 1000; }
@@ -145,6 +154,7 @@ namespace DeConzZigbee
 
         public void GetState()
         {
+            _staticInfoSent = false;   // re-send static device info on manual refresh
             if (!string.IsNullOrEmpty(_switchUid)) FetchSwitch();
             if (!string.IsNullOrEmpty(_powerUid))  FetchPower();
             if (!string.IsNullOrEmpty(_consUid))   FetchCons();
@@ -152,6 +162,7 @@ namespace DeConzZigbee
 
         public void Dispose()
         {
+            _permRun = false;
             if (_staleTimer != null) { _staleTimer.Stop(); _staleTimer = null; }
             if (!_initialized) return;
             if (!string.IsNullOrEmpty(_switchUid)) { DeConzBroker.UnregisterDevice(_switchUid, OnSwitchWs); DeConzBroker.UnregisterConnectedCallback(_switchUid); }
@@ -391,6 +402,8 @@ namespace DeConzZigbee
             {
                 string vDyn = DeConzJsonParser.ExtractTopLevelString(json, "lastseen");
                 if (vDyn != null) FireStr(OnLastSeenFb, vDyn);
+                vDyn = DeConzJsonParser.ExtractTopLevelString(json, "lastannounced");
+                if (vDyn != null) FireStr(OnLastAnnouncedFb, vDyn);
 
                 // Static device info changes practically never — parse once.
                 if (_staticInfoSent) return;
@@ -461,11 +474,53 @@ namespace DeConzZigbee
 
         private static void Fire(PowerBoolDelegate cb, ushort v)  { if (cb != null) try { cb(v); } catch { } }
         private static void Fire(PowerLevelDelegate cb, ushort v) { if (cb != null) try { cb(v); } catch { } }
-        private static void FireStr(PowerStringDelegate cb, string s)
+        private void FireStr(PowerStringDelegate cb, string s)
         {
             if (cb == null || s == null) return;
             if (s.Length > 250) s = s.Substring(0, 65000);
+            if (cb != OnDebugOut)
+            {
+                _strLock.Enter();
+                try { _lastStr[cb] = s; }
+                finally { _strLock.Leave(); }
+            }
             try { cb(new SimplSharpString(s)); } catch { }
+        }
+
+        // ── Permanent string re-assert ────────────────────────────────────
+        // Periodically re-fire the cached (non-raw, non-debug) string outputs
+        // while the global or this module's local enable is high, so late
+        // joining sinks always see the current values.
+        public void SetPermanentResend(ushort e) { _permLocal = (e != 0); }
+
+        private void ArmPermTimer()
+        {
+            int ms = DeConzBroker.PermanentResendMs;
+            if (ms < 1000) ms = 30000;
+            CTimer t = null;
+            t = new CTimer(_ =>
+            {
+                if (DeConzBroker.GlobalPermanentResend || _permLocal) ReassertStrings();
+                if (t != null) t.Dispose();
+                if (_permRun) ArmPermTimer();
+            }, null, ms);
+        }
+
+        private void ReassertStrings()
+        {
+            System.Collections.Generic.KeyValuePair<object, string>[] snap;
+            _strLock.Enter();
+            try
+            {
+                snap = new System.Collections.Generic.KeyValuePair<object, string>[_lastStr.Count];
+                ((System.Collections.Generic.ICollection<System.Collections.Generic.KeyValuePair<object, string>>)_lastStr).CopyTo(snap, 0);
+            }
+            finally { _strLock.Leave(); }
+            for (int i = 0; i < snap.Length; i++)
+            {
+                var cb = snap[i].Key as PowerStringDelegate;
+                if (cb != null) try { cb(new SimplSharpString(snap[i].Value)); } catch { }
+            }
         }
 
         private void Log(string m) { CrestronConsole.PrintLine(m); }

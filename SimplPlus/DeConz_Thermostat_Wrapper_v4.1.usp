@@ -1,0 +1,283 @@
+/*****
+  DeConz_Thermostat_Wrapper_v4.1.usp
+  SIMPL+ Wrapper for DeConzThermostat (SIMPL# class)
+
+  Zigbee thermostat (ZHAThermostat).
+  Commands via HTTP PUT to /sensors/<id>/config
+  Feedback via WebSocket events (DeConzBroker) + HTTP GET.
+
+  Temperature values in SIMPL+ use 1/100 C integers (deCONZ native):
+    2150 = 21.50 C   500 = 5.00 C
+  String outputs provide formatted one-decimal strings ("21.5", "5.0").
+
+  Offset parameter uses a +1000 bias so SIMPL+ can pass unsigned values:
+    0 = -10.0 C offset   1000 = 0   1500 = +5.0 C
+
+  DIGITAL INPUTS
+    Thermostat_On       config.on = true
+    Thermostat_Off      config.on = false
+    Lock                config.locked = true
+    Unlock              config.locked = false
+    Window_Open_On      config.windowopen_set = true
+    Window_Open_Off     config.windowopen_set = false
+    Get_State           HTTP GET full device state
+    Enable_Debug        High = debug on Debug$
+
+  ANALOG INPUTS
+    Heat_Setpoint       1/100 C e.g. 2150 = 21.5 C
+    Cool_Setpoint       1/100 C
+    Mode                0=off 1=auto 2=heat 3=cool
+    Offset              signed offset + 1000 bias (0-2000)
+
+  DIGITAL OUTPUTS
+    online              1 = WS alive
+    on_fb               thermostat enabled (config.on)
+    off_fb              thermostat disabled
+    heating_fb          currently heating (state.on / valve > 0)
+    lowbattery_fb       1 = low battery
+    locked_fb           1 = keypad locked
+    windowopen_set_fb   1 = window-open detection active
+
+  ANALOG OUTPUTS
+    Temperature_fb      measured temp in 1/100 C, SIGNED (65036 = -5.0 C)
+    Heat_Setpoint_fb    heat setpoint in 1/100 C
+    Cool_Setpoint_fb    cool setpoint in 1/100 C
+    Valve_fb            valve position 0-100 %
+    Battery_state       0-100 %
+    Voltage_fb          battery voltage in mV (ZHABattery, if available)
+    Offset_fb           signed offset + 1000 bias
+
+  STRING OUTPUTS
+    Temperature_str     "21.5"
+    Heat_Setpoint_str   "21.5"
+    Cool_Setpoint_str   "21.5"
+    Offset_str          "+0.5" or "-1.0"
+    Mode_fb             "heat" / "cool" / "auto" / "off"
+    device_id_fb / LastSeen_fb / LastAnnounced_fb /
+    Manufacturer_fb / ModelId_fb / Name_fb / Type_fb /
+    battery_raw_json / raw_json_out / Debug$
+
+  PARAMETERS
+    Device_UniqueID        Zigbee uniqueid of thermostat endpoint
+    Battery_UniqueID       uniqueid of ZHABattery endpoint (optional)
+    Online_Timeout_Seconds default 120
+
+  Programmer : martin@disnamic.com
+*/
+
+#SYMBOL_NAME "DeConz_Thermostat v4.1"
+#CATEGORY "46" "DeConZ_Zigbee"
+
+#DEFAULT_VOLATILE
+#ENABLE_STACK_CHECKING
+#ENABLE_TRACE
+
+#HELP_BEGIN
+  DeConz Thermostat v4.1
+  ------------------------
+  ZHAThermostat control + feedback. Commands go to /sensors/<id>/config.
+
+  Temperature scale: deCONZ native 1/100 C integers.
+  Heat_Setpoint input: 2150 = 21.5 C. Use Temperature_str / Heat_Setpoint_str
+  string outputs for display; use analog outputs for logic and comparisons.
+
+  Offset bias: SIMPL passes unsigned ushort = actual_offset + 1000.
+  Example: to set -0.5 C offset send Offset = 950 (950 - 1000 = -50 = -0.5 C).
+
+  config.on vs state.on:
+    on_fb / off_fb  = thermostat enabled/disabled (config.on)
+    heating_fb      = currently heating (state.on or valve > 0)
+#HELP_END
+
+#USER_SIMPLSHARP_LIBRARY "DeConzZigbee"
+
+/*****
+  I/O Declarations
+*/
+DIGITAL_INPUT  _SKIP_,_SKIP_,_SKIP_,
+               Thermostat_On, Thermostat_Off, _SKIP_,
+               Lock, Unlock, _SKIP_,
+               Window_Open_On, Window_Open_Off, _SKIP_,
+               Valve_Open, Valve_Close, _SKIP_,
+               Schedule_On, Schedule_Off, _SKIP_,
+               Display_Flip_On, Display_Flip_Off, _SKIP_,
+               Get_State, Enable_Debug, Enable_Raw_Json, Permanent_Resend_Enable;
+
+ANALOG_INPUT   Heat_Setpoint, Cool_Setpoint, Mode, Offset, External_Temperature;
+
+DIGITAL_OUTPUT _SKIP_,_SKIP_,_SKIP_,
+               online, _SKIP_,
+               on_fb, off_fb, heating_fb, _SKIP_,
+               lowbattery_fb, locked_fb, windowopen_set_fb,
+               windowopen_detected_fb, schedule_on_fb,
+               setvalve_fb, displayflipped_fb;
+
+ANALOG_OUTPUT  Temperature_fb, Heat_Setpoint_fb, Cool_Setpoint_fb,
+               Valve_fb, Battery_state, Offset_fb, Voltage_fb;
+
+STRING_OUTPUT  Temperature_str, Heat_Setpoint_str, Cool_Setpoint_str,
+               Offset_str, Mode_fb, errorcode_fb, _SKIP_,
+               device_id_fb, LastSeen_fb, LastAnnounced_fb,
+               Manufacturer_fb, ModelId_fb, Name_fb, Type_fb, _SKIP_,
+               battery_raw_json, raw_json_out, Debug$;
+
+/*****
+  Parameters
+*/
+STRING_PARAMETER  Device_UniqueID[64], Battery_UniqueID[64];
+INTEGER_PARAMETER Online_Timeout_Seconds;
+
+
+#BEGIN_PARAMETER_PROPERTIES Device_UniqueID
+  propValidUnits       = unitString;
+  propDefaultValue     = "00:00:00:00:00:00:00:00-01";
+  propShortDescription = "Zigbee uniqueid (Phoscon App → device → Advanced)";
+#END_PARAMETER_PROPERTIES
+
+#BEGIN_PARAMETER_PROPERTIES Battery_UniqueID
+  propValidUnits       = unitString;
+  propDefaultValue     = "";
+  propShortDescription = "ZHABattery sensor uniqueid (leave empty if not available)";
+#END_PARAMETER_PROPERTIES
+
+#BEGIN_PARAMETER_PROPERTIES Online_Timeout_Seconds
+  propValidUnits       = unitDecimal;
+  propDefaultUnit      = unitDecimal;
+  propDefaultValue     = 120d;
+  propShortDescription = "Seconds without WS traffic until online→0 (default 120)";
+#END_PARAMETER_PROPERTIES
+
+/*****
+  SIMPL# Object
+*/
+DeConzThermostat myThermo;
+
+/*****
+  Delegate Callbacks
+*/
+CALLBACK FUNCTION CB_Online(INTEGER v)           { online              = v; }
+CALLBACK FUNCTION CB_LowBattery(INTEGER v)       { lowbattery_fb       = v; }
+CALLBACK FUNCTION CB_BatteryLevel(INTEGER v)     { Battery_state       = v; }
+CALLBACK FUNCTION CB_OnFb(INTEGER v)             { on_fb               = v; }
+CALLBACK FUNCTION CB_OffFb(INTEGER v)            { off_fb              = v; }
+CALLBACK FUNCTION CB_HeatingFb(INTEGER v)        { heating_fb          = v; }
+CALLBACK FUNCTION CB_ValveFb(INTEGER v)          { Valve_fb            = v; }
+CALLBACK FUNCTION CB_TemperatureFb(INTEGER v)    { Temperature_fb      = v; }
+CALLBACK FUNCTION CB_HeatSetpointFb(INTEGER v)   { Heat_Setpoint_fb    = v; }
+CALLBACK FUNCTION CB_CoolSetpointFb(INTEGER v)   { Cool_Setpoint_fb    = v; }
+CALLBACK FUNCTION CB_LockedFb(INTEGER v)         { locked_fb           = v; }
+CALLBACK FUNCTION CB_OffsetFb(INTEGER v)         { Offset_fb           = v; }
+CALLBACK FUNCTION CB_WindowOpenSetFb(INTEGER v)  { windowopen_set_fb   = v; }
+CALLBACK FUNCTION CB_WinOpenDetected(INTEGER v)      { windowopen_detected_fb = v; }
+CALLBACK FUNCTION CB_ScheduleOnFb(INTEGER v)         { schedule_on_fb         = v; }
+CALLBACK FUNCTION CB_SetValveFb(INTEGER v)           { setvalve_fb            = v; }
+CALLBACK FUNCTION CB_DisplayFlippedFb(INTEGER v)     { displayflipped_fb      = v; }
+CALLBACK FUNCTION CB_ErrorCodeFb(STRING s)           { errorcode_fb           = s; }
+
+CALLBACK FUNCTION CB_TemperatureStr(STRING s)    { Temperature_str     = s; }
+CALLBACK FUNCTION CB_HeatSetpointStr(STRING s)   { Heat_Setpoint_str   = s; }
+CALLBACK FUNCTION CB_CoolSetpointStr(STRING s)   { Cool_Setpoint_str   = s; }
+CALLBACK FUNCTION CB_OffsetStr(STRING s)         { Offset_str          = s; }
+CALLBACK FUNCTION CB_ModeFb(STRING s)            { Mode_fb             = s; }
+CALLBACK FUNCTION CB_DeviceId(STRING s)          { device_id_fb        = s; }
+CALLBACK FUNCTION CB_LastSeen(STRING s)          { LastSeen_fb         = s; }
+CALLBACK FUNCTION CB_LastAnnounced(STRING s)     { LastAnnounced_fb    = s; }
+CALLBACK FUNCTION CB_Manufacturer(STRING s)      { Manufacturer_fb     = s; }
+CALLBACK FUNCTION CB_ModelId(STRING s)           { ModelId_fb          = s; }
+CALLBACK FUNCTION CB_Name(STRING s)              { Name_fb             = s; }
+CALLBACK FUNCTION CB_Type(STRING s)              { Type_fb             = s; }
+CALLBACK FUNCTION CB_BatteryRaw(STRING s)        { battery_raw_json    = s; }
+CALLBACK FUNCTION CB_VoltageFb(INTEGER v)         { Voltage_fb          = v; }
+CALLBACK FUNCTION CB_RawJson(STRING s)            { raw_json_out        = s; }
+CALLBACK FUNCTION CB_Debug(STRING s)             { Debug$              = s; }
+
+/*****
+  Input Handlers
+*/
+PUSH Thermostat_On  { myThermo.SetOn();  }
+PUSH Thermostat_Off { myThermo.SetOff(); }
+PUSH Lock           { myThermo.Lock();   }
+PUSH Unlock         { myThermo.Unlock(); }
+
+PUSH Window_Open_On  { myThermo.SetWindowOpenDetection(1); }
+PUSH Window_Open_Off { myThermo.SetWindowOpenDetection(0); }
+PUSH Valve_Open       { myThermo.SetValve(1); }
+PUSH Valve_Close      { myThermo.SetValve(0); }
+PUSH Schedule_On      { myThermo.SetScheduleOn(1); }
+PUSH Schedule_Off     { myThermo.SetScheduleOn(0); }
+PUSH Display_Flip_On  { myThermo.SetDisplayFlipped(1); }
+PUSH Display_Flip_Off { myThermo.SetDisplayFlipped(0); }
+
+PUSH Get_State { myThermo.GetState(); }
+
+CHANGE Enable_Debug { myThermo.SetDebug(Enable_Debug); }
+CHANGE Permanent_Resend_Enable { myThermo.SetPermanentResend(Permanent_Resend_Enable); }
+CHANGE Enable_Raw_Json { myThermo.SetRawJsonEnabled(Enable_Raw_Json); }
+
+THREADSAFE CHANGE Heat_Setpoint
+{
+    // Guard against SIMPL+ startup: uncabled AI initialises to 0.
+    // The C# layer enforces 500-3500 too, but an explicit check here
+    // avoids the log noise on every program start.
+    IF (Heat_Setpoint >= 500 && Heat_Setpoint <= 3500) {
+        myThermo.SetHeatSetpoint(Heat_Setpoint);
+    }
+}
+THREADSAFE CHANGE Cool_Setpoint
+{
+    IF (Cool_Setpoint >= 500 && Cool_Setpoint <= 3500) {
+        myThermo.SetCoolSetpoint(Cool_Setpoint);
+    }
+}
+THREADSAFE CHANGE Mode          { myThermo.SetMode(Mode); }
+THREADSAFE CHANGE Offset        { myThermo.SetOffset(Offset); }
+THREADSAFE CHANGE External_Temperature { myThermo.SetExternalTemperature(External_Temperature); }
+
+/*****
+  Main
+*/
+Function Main()
+{
+  WaitForInitializationComplete();
+
+  RegisterDelegate(myThermo, OnOnline,            CB_Online);
+  RegisterDelegate(myThermo, OnLowBattery,        CB_LowBattery);
+  RegisterDelegate(myThermo, OnBatteryLevel,      CB_BatteryLevel);
+  RegisterDelegate(myThermo, OnOnFb,              CB_OnFb);
+  RegisterDelegate(myThermo, OnOffFb,             CB_OffFb);
+  RegisterDelegate(myThermo, OnHeatingFb,         CB_HeatingFb);
+  RegisterDelegate(myThermo, OnValveFb,           CB_ValveFb);
+  RegisterDelegate(myThermo, OnTemperatureFb,     CB_TemperatureFb);
+  RegisterDelegate(myThermo, OnHeatSetpointFb,    CB_HeatSetpointFb);
+  RegisterDelegate(myThermo, OnCoolSetpointFb,    CB_CoolSetpointFb);
+  RegisterDelegate(myThermo, OnLockedFb,          CB_LockedFb);
+  RegisterDelegate(myThermo, OnOffsetFb,          CB_OffsetFb);
+  RegisterDelegate(myThermo, OnWindowOpenSetFb,   CB_WindowOpenSetFb);
+  RegisterDelegate(myThermo, OnWindowOpenDetectedFb,  CB_WinOpenDetected);
+  RegisterDelegate(myThermo, OnScheduleOnFb,          CB_ScheduleOnFb);
+  RegisterDelegate(myThermo, OnSetValveFb,            CB_SetValveFb);
+  RegisterDelegate(myThermo, OnDisplayFlippedFb,      CB_DisplayFlippedFb);
+  RegisterDelegate(myThermo, OnErrorCodeFb,           CB_ErrorCodeFb);
+  RegisterDelegate(myThermo, OnTemperatureStrFb,  CB_TemperatureStr);
+  RegisterDelegate(myThermo, OnHeatSetpointStrFb, CB_HeatSetpointStr);
+  RegisterDelegate(myThermo, OnCoolSetpointStrFb, CB_CoolSetpointStr);
+  RegisterDelegate(myThermo, OnOffsetStrFb,       CB_OffsetStr);
+  RegisterDelegate(myThermo, OnModeFb,            CB_ModeFb);
+  RegisterDelegate(myThermo, OnDeviceIdFb,        CB_DeviceId);
+  RegisterDelegate(myThermo, OnLastSeenFb,        CB_LastSeen);
+  RegisterDelegate(myThermo, OnLastAnnouncedFb,   CB_LastAnnounced);
+  RegisterDelegate(myThermo, OnManufacturerFb,    CB_Manufacturer);
+  RegisterDelegate(myThermo, OnModelIdFb,         CB_ModelId);
+  RegisterDelegate(myThermo, OnNameFb,            CB_Name);
+  RegisterDelegate(myThermo, OnTypeFb,            CB_Type);
+  RegisterDelegate(myThermo, OnBatteryRawJson,    CB_BatteryRaw);
+  RegisterDelegate(myThermo, OnVoltageFb,         CB_VoltageFb);
+  RegisterDelegate(myThermo, OnRawJsonFb,         CB_RawJson);
+  RegisterDelegate(myThermo, OnDebugOut,          CB_Debug);
+
+  myThermo.SetOnlineTimeout(Online_Timeout_Seconds);
+  myThermo.SetRawJsonEnabled(Enable_Raw_Json);
+  myThermo.SetPermanentResend(Permanent_Resend_Enable);
+  myThermo.Initialize(Device_UniqueID, Battery_UniqueID);
+  myThermo.SetDebug(Enable_Debug);
+}

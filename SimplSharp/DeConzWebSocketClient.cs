@@ -106,9 +106,42 @@ namespace DeConzZigbee
             Log("[GW] TLS/WSS " + (_useTls ? "enabled" : "disabled"));
         }
 
+        /// <summary>
+        /// Central deCONZ API key (called from SIMPL+ before Initialize).
+        /// Distributed to all device modules via the static broker; device
+        /// modules no longer take a per-module API key.
+        /// </summary>
+        public void SetApiKey(string apiKey)
+        {
+            DeConzBroker.ApiKey = apiKey == null ? "" : apiKey.Trim();
+            Log("[GW] API key set (" + (string.IsNullOrEmpty(DeConzBroker.ApiKey) ? "empty" : "len " + DeConzBroker.ApiKey.Length) + ")");
+        }
+
         public void SetDebug(ushort enable)
         {
             _debugEnabled = (enable != 0);
+        }
+
+        /// <summary>
+        /// Global "make string permanent" enable for all device modules
+        /// (called from SIMPL+). High forces periodic string re-assert on every
+        /// module, overriding their local enables; low lets each module's local
+        /// enable decide. Routed AppDomain-wide via the static broker.
+        /// </summary>
+        public void SetPermanentResend(ushort enable)
+        {
+            DeConzBroker.SetGlobalPermanentResend(enable != 0);
+            Log("[GW] Global permanent string resend " + (enable != 0 ? "enabled" : "disabled"));
+        }
+
+        /// <summary>
+        /// Global re-assert interval in seconds for all device modules
+        /// (called from SIMPL+ before Initialize). Default 30 s.
+        /// </summary>
+        public void SetPermanentResendInterval(int seconds)
+        {
+            DeConzBroker.SetPermanentResendInterval(seconds);
+            Log(string.Format("[GW] Permanent resend interval set to {0} s", seconds < 1 ? 30 : seconds));
         }
 
         /// <summary>Open (or re-open) the WebSocket connection.</summary>

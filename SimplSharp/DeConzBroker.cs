@@ -50,6 +50,34 @@ namespace DeConzZigbee
         // No signal wiring required.
         public static string GatewayIP { get; internal set; }
 
+        // ── deCONZ API key – written by DeConzWebSocketClient (Gateway module) ─
+        // Entered once as a Gateway parameter and distributed to every device
+        // module via this broker. Device modules read it lazily when building
+        // their HTTP request URLs – no per-module API key parameter.
+        public static string ApiKey { get; internal set; }
+
+        // ── Permanent string re-assert (global, set by the Gateway module) ───
+        // When GlobalPermanentResend is high every device module periodically
+        // re-fires its cached (non-raw, non-debug) string outputs, so late-
+        // joining sinks (panel reconnect, program restart) always see the
+        // current values – the internal equivalent of the SIMPL "Make String
+        // Permanent" symbol. The effective per-module state is
+        // (GlobalPermanentResend OR the module's local enable). The interval
+        // is the global Gateway parameter; modules read it on every tick.
+        public static bool GlobalPermanentResend { get; private set; }
+        public static int  PermanentResendMs     { get; private set; }
+
+        static DeConzBroker() { PermanentResendMs = 30000; }
+
+        /// <summary>Global enable, set by the Gateway module's digital input.</summary>
+        public static void SetGlobalPermanentResend(bool on) { GlobalPermanentResend = on; }
+
+        /// <summary>Global re-assert interval (seconds), set by the Gateway parameter.</summary>
+        public static void SetPermanentResendInterval(int seconds)
+        {
+            PermanentResendMs = (seconds < 1 ? 30 : seconds) * 1000;
+        }
+
         // ── WS send callback – set by DeConzWebSocketClient after handshake ───
         // Device modules call SendCommand() to push a command over the live WS.
         internal static Action<string> SendWsFrame { get; set; }
