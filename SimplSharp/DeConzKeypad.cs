@@ -74,8 +74,19 @@ namespace DeConzZigbee
         // ── Private state ─────────────────────────────────────────────────
         private string _uniqueId;
         private string _rotaryUid;
-        private int    _fullScaleDeg = 720;   // rotations × 360 = full-scale rotation for 0-100%
-        private double _accumDeg;             // accumulated rotation, clamped [0, _fullScaleDeg]
+        // Rotary level — time-based extrapolation. The dial reports a fixed rate
+        // ~1/s while moving (rotaryevent 1 = moving, 2 = stop), so we ramp
+        // Level_fb at full-scale / Full_Scale_Seconds toward 0 or 65535 while a
+        // move is active, and stop on event 2 or after a short no-event timeout.
+        private const int RampTickMs    = 50;
+        private const int MoveTimeoutMs = 1300;
+        private readonly CCriticalSection _rampLock = new CCriticalSection();
+        private double   _levelRaw;            // current level 0..65535
+        private int      _fullScaleMs = 4000;  // Full_Scale_Seconds × 1000
+        private int      _rampDir;             // -1 / 0 / +1
+        private DateTime _lastRotaryUtc;
+        private CTimer   _rampTimer;
+        private int      _lastLevelFired = -1;
         private string _apiKey { get { return DeConzBroker.ApiKey ?? ""; } }
         private string _deviceId;    // resolved from first WS frame
         private string _resource;    // resolved from first WS frame
@@ -108,7 +119,7 @@ namespace DeConzZigbee
         /// </summary>
         public void Initialize(string uniqueId, string rotaryUniqueId,
                                int numberOfButtons, int onlineTimeoutSeconds,
-                               int fullScaleRotations)
+                               int fullScaleSeconds)
         {
             if (string.IsNullOrEmpty(uniqueId))
             {
@@ -119,7 +130,7 @@ namespace DeConzZigbee
             _uniqueId        = uniqueId.Trim().ToLowerInvariant();
             _numberOfButtons = Math.Max(1, Math.Min(MaxButtons, numberOfButtons));
             _onlineTimeoutMs = Math.Max(5000, onlineTimeoutSeconds * 1000);
-            _fullScaleDeg    = Math.Max(1, fullScaleRotations) * 360;
+            _fullScaleMs     = Math.Max(1, fullScaleSeconds) * 1000;
             _initialized     = true;
 
             _http.TimeoutEnabled = true;
@@ -156,15 +167,59 @@ namespace DeConzZigbee
         /// </summary>
         public void SetLevel(ushort raw)
         {
-            _accumDeg = (raw / 65535.0) * _fullScaleDeg;
-            FireLevel();
+            _rampLock.Enter();
+            try { _levelRaw = raw; }
+            finally { _rampLock.Leave(); }
+            FireLevel(raw);
         }
 
-        private void FireLevel()
+        private void FireLevel(int raw)
         {
-            double frac = (_fullScaleDeg > 0) ? (_accumDeg / _fullScaleDeg) : 0.0;
-            if (frac < 0) frac = 0; else if (frac > 1) frac = 1;
-            Fire(OnLevelFb, (ushort)Math.Round(frac * 65535.0));
+            if (raw == _lastLevelFired) return;
+            _lastLevelFired = raw;
+            Fire(OnLevelFb, (ushort)raw);
+        }
+
+        // ── Rotary level ramp (time-based extrapolation) ──────────────────
+        private void StartRamp(int dir)
+        {
+            _rampLock.Enter();
+            try
+            {
+                _rampDir       = dir;
+                _lastRotaryUtc = DateTime.UtcNow;
+                if (_rampTimer == null)
+                    _rampTimer = new CTimer(_ => RampTick(), null, RampTickMs, RampTickMs);
+            }
+            finally { _rampLock.Leave(); }
+        }
+
+        private void StopRamp()
+        {
+            _rampLock.Enter();
+            try { _rampDir = 0; }
+            finally { _rampLock.Leave(); }
+        }
+
+        private void RampTick()
+        {
+            int fire = -1;
+            _rampLock.Enter();
+            try
+            {
+                if (_rampDir == 0) return;
+                if ((DateTime.UtcNow - _lastRotaryUtc).TotalMilliseconds > MoveTimeoutMs)
+                {
+                    _rampDir = 0;   // no rotary event for a while → wheel stopped
+                    return;
+                }
+                _levelRaw += _rampDir * (65535.0 / _fullScaleMs) * RampTickMs;
+                if      (_levelRaw < 0)     _levelRaw = 0;
+                else if (_levelRaw > 65535) _levelRaw = 65535;
+                fire = (int)Math.Round(_levelRaw);
+            }
+            finally { _rampLock.Leave(); }
+            FireLevel(fire);
         }
 
         public void Dispose()
@@ -177,6 +232,7 @@ namespace DeConzZigbee
             if (!string.IsNullOrEmpty(_rotaryUid)) DeConzBroker.UnregisterDevice(_rotaryUid, OnRotaryWs);
             StopOnlineTimer();
             if (_pollTimer != null) { _pollTimer.Stop(); _pollTimer = null; }
+            if (_rampTimer != null) { _rampTimer.Stop(); _rampTimer = null; }
             _initialized = false;
         }
 
@@ -342,15 +398,17 @@ namespace DeConzZigbee
                     Fire(OnRotationFb, (ushort)rot.Value);   // signed (two's complement)
                     if      (rot.Value > 0) Fire(OnRotateCw, 1);
                     else if (rot.Value < 0) Fire(OnRotateCcw, 1);
-                    _accumDeg += rot.Value;
-                    if      (_accumDeg < 0)             _accumDeg = 0;
-                    else if (_accumDeg > _fullScaleDeg) _accumDeg = _fullScaleDeg;
-                    FireLevel();
                 }
                 int? ev = DeConzJsonParser.ExtractInt(json, "rotaryevent", 2);
                 if (ev.HasValue) Fire(OnRotaryEventFb, (ushort)Math.Max(0, Math.Min(65535, ev.Value)));
                 int? dur = DeConzJsonParser.ExtractInt(json, "expectedeventduration", 2);
                 if (dur.HasValue) Fire(OnRotationDurationFb, (ushort)Math.Max(0, Math.Min(65535, dur.Value)));
+
+                // Time-based ramp: rotaryevent 2 = stop; event 1 with a
+                // direction = move (the dial's magnitude carries no speed info).
+                if (ev.HasValue && ev.Value == 2)        StopRamp();
+                else if (rot.HasValue && rot.Value != 0) StartRamp(rot.Value > 0 ? 1 : -1);
+
                 DebugLog(string.Format("[Keypad rotary:{0}] rotation={1} event={2} duration={3}",
                     _rotaryUid, rot, ev, dur));
             }

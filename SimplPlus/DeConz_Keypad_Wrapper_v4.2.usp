@@ -46,7 +46,7 @@
     Rotary_UniqueID         Optional ZHARelativeRotary endpoint (scroll/dial)
     Number_of_Buttons       1-10
     Online_Timeout_Seconds  Default 120
-    Full_Scale_Rotations    Full turns of the dial for 0-100% (Level_fb), default 2
+    Full_Scale_Seconds      Seconds of continuous turning for 0-100% (Level_fb), default 4
 
   Programmer : martin@disnamic.com
 */
@@ -90,7 +90,7 @@ STRING_OUTPUT  LastAnnounced_fb, LastSeen_fb,
                raw_json_out, Debug$;
 
 STRING_PARAMETER  Device_UniqueID[64], Rotary_UniqueID[64];
-INTEGER_PARAMETER Number_of_Buttons, Online_Timeout_Seconds, Full_Scale_Rotations;
+INTEGER_PARAMETER Number_of_Buttons, Online_Timeout_Seconds, Full_Scale_Seconds;
 
 
 #BEGIN_PARAMETER_PROPERTIES Device_UniqueID
@@ -123,12 +123,12 @@ INTEGER_PARAMETER Number_of_Buttons, Online_Timeout_Seconds, Full_Scale_Rotation
   propShortDescription = "Offline timeout in seconds (default 120)";
 #END_PARAMETER_PROPERTIES
 
-#BEGIN_PARAMETER_PROPERTIES Full_Scale_Rotations
+#BEGIN_PARAMETER_PROPERTIES Full_Scale_Seconds
   propValidUnits  = unitDecimal;
   propDefaultUnit = unitDecimal;
-  propBounds      = 1d , 50d ;
-  propDefaultValue = 2d;
-  propShortDescription = "Full dial turns for 0-100% on Level_fb (1 turn = 360 deg)";
+  propBounds      = 1d , 60d ;
+  propDefaultValue = 4d;
+  propShortDescription = "Seconds of continuous turning for 0-100% on Level_fb (default 4)";
 #END_PARAMETER_PROPERTIES
 
 
@@ -219,6 +219,6 @@ Function Main()
   myKeypad.SetPermanentResend(Permanent_Resend_Enable);
   myKeypad.Initialize(Device_UniqueID, Rotary_UniqueID,
                       Number_of_Buttons, Online_Timeout_Seconds,
-                      Full_Scale_Rotations);
+                      Full_Scale_Seconds);
   myKeypad.SetDebug(Enable_Debug);
 }
