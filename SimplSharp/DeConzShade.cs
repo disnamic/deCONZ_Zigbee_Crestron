@@ -701,7 +701,7 @@ namespace DeConzZigbee
         private void FireStr(ShadeStringDelegate cb, string s)
         {
             if (cb == null || s == null) return;
-            if (s.Length > 250) s = s.Substring(0, 65000);
+            if (s.Length > 250) s = s.Substring(0, 250);
             if (cb != OnDebugOut)
             {
                 _strLock.Enter();

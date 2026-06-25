@@ -4,6 +4,25 @@
 ================================================================================
 
 --------------------------------------------------------------------------------
+Version 4.1.1  (2026-06-25)
+--------------------------------------------------------------------------------
+Bugfix release (library only — no wrapper/signal changes).
+
+FireStr truncation crash fixed (Power, Valve, Shade, Alarm, Motion, GroupControl,
+Scene):
+  - FireStr truncated over-long strings with s.Substring(0, 65000) instead of
+    s.Substring(0, 250). For any string between 251 and 64999 characters this
+    threw ArgumentOutOfRangeException. In practice it fired whenever Enable_Debug
+    was on (DebugLog passes a 251-character "…"-trimmed message to FireStr): the
+    uncaught exception aborted parsing of the WebSocket event, so the affected
+    module stopped updating its outputs while debug was enabled. The other five
+    modules already used the correct 250 cap. Build a new DeConzZigbee.clz; no
+    wrapper recompile or demo re-wiring is required.
+
+Build:
+  - AssemblyVersion / AssemblyFileVersion 4.1.1.0.
+
+--------------------------------------------------------------------------------
 Version 4.1.0  (2026-06-25)
 --------------------------------------------------------------------------------
 Feature release. Adds the missing LastAnnounced output to the last three modules,

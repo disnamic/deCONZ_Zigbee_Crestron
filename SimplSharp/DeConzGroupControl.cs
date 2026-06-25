@@ -592,7 +592,7 @@ namespace DeConzZigbee
         private static void FireStr(GroupStringDelegate cb, string s)
         {
             if (cb == null || s == null) return;
-            if (s.Length > 250) s = s.Substring(0, 65000);
+            if (s.Length > 250) s = s.Substring(0, 250);
             try { cb(new SimplSharpString(s)); } catch { }
         }
 
