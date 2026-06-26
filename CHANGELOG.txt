@@ -11,6 +11,10 @@ relative-rotary (scroll-wheel / dial) endpoint. Only the Keypad symbol moves to
 the v4.2 generation; the other 13 modules are unchanged and stay v4.1 (their
 symbols remain compatible with the 4.2.0.0 library).
 
+This release also folds in suite-wide library hardening (performance and memory)
+that changes no wrapper signals and keeps every symbol compatible — see
+"Library hardening" below.
+
 Keypad — triple/treble press (buttonevent 005):
   - New DIGITAL_OUTPUT Button_triple_press_fb[1..N] (500 ms pulse) for deCONZ
     buttonevent code 005 (e.g. the IKEA BILRESA / E2490 wheel click). The
@@ -46,6 +50,34 @@ BREAKING (Keypad symbol only):
     filename now carry "v4.2" (DeConz_Keypad v4.2 /
     DeConz_Keypad_Wrapper_v4.2.usp). Replace the v4.1 keypad symbol with the v4.2
     one and re-check its connections. The other modules are not affected.
+
+Library hardening (all modules — no wrapper/signal changes):
+  Performance and memory improvements in the shared SIMPL# library. No symbol,
+  parameter or signal positions change; existing v4.1 (and v4.2 Keypad) symbols
+  stay compatible.
+
+  - CTimer disposal: every per-module teardown timer (stale / poll / online /
+    move / brightness / rotary-ramp) and the Gateway alive / reconnect timers
+    are now Dispose()-d, not merely Stop()-ed, releasing the native timer handle.
+    The Gateway reconnect timer previously leaked one timer on every
+    disconnect/reconnect cycle — the only leak that accumulated at run time.
+  - Keypad rotary ramp timer: now halts when the wheel is idle and re-arms on the
+    next rotary event, instead of waking the processor at the 50 ms ramp rate
+    permanently after the first rotation.
+  - Gateway WebSocket frame buffer: reworked from a full reallocate-and-copy on
+    every TCP chunk and every decoded frame (O(n^2)) to an offset/length buffer
+    with a single compaction per pass (O(n)). Bytes that a server coalesces into
+    the same TCP segment as the 101 handshake response are now recovered instead
+    of dropped.
+  - JSON micro-parser: ExtractBool / ExtractInt no longer allocate an
+    intermediate substring per call (ordinal compare / manual integer parse on
+    the hot path). The shared stagger RNG and the Gateway masking RNG now use
+    CCriticalSection instead of lock(). Gateway uniqueid routing does a single
+    scan per event.
+  - WebSocket event parse-gating: the depth-2 state/config parsers are skipped on
+    heartbeat frames that carry no state/config block; top-level lastseen and
+    identity outputs are still processed. Behaviour-preserving — depth-2 value
+    fields exist only inside state/config.
 
 Build:
   - AssemblyVersion / AssemblyFileVersion 4.2.0.0.

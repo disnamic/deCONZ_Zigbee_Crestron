@@ -56,7 +56,12 @@ namespace DeConzZigbee
         private CTimer       _reconnectTimer;
 
         // ── Frame accumulation buffer ─────────────────────────────────────
-        private byte[]  _frameBuffer = new byte[0];
+        // Growable buffer with a separate valid-length field. Incoming chunks are
+        // appended in place and consumed frames are removed by a single compaction
+        // per ProcessFrameBuffer() pass – avoiding the previous O(n²) full
+        // reallocate+copy on every TCP chunk and every decoded frame.
+        private byte[]  _frameBuffer = new byte[8192];
+        private int     _frameLen;
 
         private readonly CCriticalSection _sendLock = new CCriticalSection();
 
@@ -65,6 +70,7 @@ namespace DeConzZigbee
         // DateTime.Now.Ticks) can yield identical seeds for frames sent within
         // the same system tick, producing repeated masking keys.
         private static readonly Random _rng = new Random();
+        private static readonly CCriticalSection _rngLock = new CCriticalSection();
 
         // ── Public API ────────────────────────────────────────────────────
 
@@ -170,7 +176,7 @@ namespace DeConzZigbee
                 CloseSocket();
 
                 _handshakeDone = false;
-                _frameBuffer   = new byte[0];
+                _frameLen      = 0;
                 _wsKey         = GenerateWebSocketKey();
 
                 Log(string.Format("[GW] Connecting ({0})…", _useTls ? "WSS/TLS" : "WS/plain"));
@@ -289,12 +295,28 @@ namespace DeConzZigbee
             }
             else
             {
-                var combined = new byte[_frameBuffer.Length + chunk.Length];
-                Array.Copy(_frameBuffer, combined, _frameBuffer.Length);
-                Array.Copy(chunk, 0, combined, _frameBuffer.Length, chunk.Length);
-                _frameBuffer = combined;
+                AppendToFrameBuffer(chunk, 0, chunk.Length);
                 ProcessFrameBuffer();
             }
+        }
+
+        // Append bytes to the frame buffer, growing it (doubling) only when the
+        // current capacity is exceeded. The buffer is never shrunk – it settles
+        // at the largest burst seen, which is bounded for deCONZ traffic.
+        private void AppendToFrameBuffer(byte[] data, int offset, int count)
+        {
+            if (count <= 0) return;
+            int needed = _frameLen + count;
+            if (_frameBuffer.Length < needed)
+            {
+                int cap = _frameBuffer.Length < 1 ? 8192 : _frameBuffer.Length;
+                while (cap < needed) cap <<= 1;
+                var bigger = new byte[cap];
+                Array.Copy(_frameBuffer, bigger, _frameLen);
+                _frameBuffer = bigger;
+            }
+            Array.Copy(data, offset, _frameBuffer, _frameLen, count);
+            _frameLen += count;
         }
 
         // ── WebSocket handshake ───────────────────────────────────────────
@@ -335,6 +357,17 @@ namespace DeConzZigbee
                 DeConzBroker.SendWsFrame = SendTextFrame;
                 // Notify all light modules to schedule a delayed GetState()
                 DeConzBroker.NotifyWsConnected();
+
+                // Any bytes after the header terminator are already WS frame data
+                // (server may coalesce the 101 response and the first event into
+                // one TCP segment). Feed them to the frame buffer instead of
+                // dropping them.
+                int bodyStart = IndexOfHeaderEnd(data);
+                if (bodyStart >= 0 && bodyStart < data.Length)
+                {
+                    AppendToFrameBuffer(data, bodyStart, data.Length - bodyStart);
+                    ProcessFrameBuffer();
+                }
             }
             else if (text.Contains("HTTP/1.1 4") || text.Contains("HTTP/1.1 5"))
             {
@@ -343,51 +376,63 @@ namespace DeConzZigbee
             }
         }
 
+        // Returns the index just past the "\r\n\r\n" HTTP header terminator, or -1.
+        private static int IndexOfHeaderEnd(byte[] data)
+        {
+            for (int i = 0; i + 3 < data.Length; i++)
+            {
+                if (data[i] == 13 && data[i + 1] == 10 &&
+                    data[i + 2] == 13 && data[i + 3] == 10)
+                    return i + 4;
+            }
+            return -1;
+        }
+
         // ── WebSocket frame decoder (RFC 6455) ────────────────────────────
 
         private void ProcessFrameBuffer()
         {
-            while (_frameBuffer.Length >= 2)
+            int pos = 0;   // read offset into the valid region [0, _frameLen)
+
+            while (_frameLen - pos >= 2)
             {
-                bool fin        = (_frameBuffer[0] & 0x80) != 0;
-                int  opcode     = (_frameBuffer[0] & 0x0F);
-                bool masked     = (_frameBuffer[1] & 0x80) != 0;
-                long payloadLen = (_frameBuffer[1] & 0x7F);
+                bool fin        = (_frameBuffer[pos]     & 0x80) != 0;
+                int  opcode     = (_frameBuffer[pos]     & 0x0F);
+                bool masked     = (_frameBuffer[pos + 1] & 0x80) != 0;
+                long payloadLen = (_frameBuffer[pos + 1] & 0x7F);
                 int  headerLen  = 2;
 
                 if (payloadLen == 126)
                 {
-                    if (_frameBuffer.Length < 4) break;
-                    payloadLen = (_frameBuffer[2] << 8) | _frameBuffer[3];
+                    if (_frameLen - pos < 4) break;
+                    payloadLen = (_frameBuffer[pos + 2] << 8) | _frameBuffer[pos + 3];
                     headerLen  = 4;
                 }
                 else if (payloadLen == 127)
                 {
-                    if (_frameBuffer.Length < 10) break;
+                    if (_frameLen - pos < 10) break;
                     payloadLen = 0;
                     for (int i = 0; i < 8; i++)
-                        payloadLen = (payloadLen << 8) | _frameBuffer[2 + i];
+                        payloadLen = (payloadLen << 8) | _frameBuffer[pos + 2 + i];
                     headerLen = 10;
                 }
 
                 if (masked) headerLen += 4;
 
                 long totalLen = headerLen + payloadLen;
-                if (_frameBuffer.Length < totalLen) break;
+                if (_frameLen - pos < totalLen) break;
 
                 var payload = new byte[payloadLen];
-                Array.Copy(_frameBuffer, headerLen, payload, 0, (int)payloadLen);
+                Array.Copy(_frameBuffer, pos + headerLen, payload, 0, (int)payloadLen);
 
                 if (masked)
                 {
-                    int maskOffset = headerLen - 4;
+                    int maskOffset = pos + headerLen - 4;
                     for (long i = 0; i < payloadLen; i++)
                         payload[i] ^= _frameBuffer[maskOffset + (i % 4)];
                 }
 
-                var remaining = new byte[_frameBuffer.Length - totalLen];
-                Array.Copy(_frameBuffer, totalLen, remaining, 0, remaining.Length);
-                _frameBuffer = remaining;
+                pos += (int)totalLen;
 
                 switch (opcode)
                 {
@@ -405,6 +450,7 @@ namespace DeConzZigbee
 
                     case 0x08: // Close
                         Log("[GW] Server sent Close frame");
+                        _frameLen = 0;
                         if (!_intentionalDisconnect) ScheduleReconnect();
                         return;
 
@@ -416,6 +462,16 @@ namespace DeConzZigbee
                         break;
                 }
             }
+
+            // Compact once: drop the consumed prefix [0, pos), keep the partial
+            // frame tail [pos, _frameLen) at the front for the next chunk.
+            if (pos > 0)
+            {
+                int remaining = _frameLen - pos;
+                if (remaining > 0)
+                    Array.Copy(_frameBuffer, pos, _frameBuffer, 0, remaining);
+                _frameLen = remaining;
+            }
         }
 
         // ── JSON routing ──────────────────────────────────────────────────
@@ -423,15 +479,12 @@ namespace DeConzZigbee
         private void HandleTextFrame(string json)
         {
             if (_debugEnabled) DebugLog("[RX] " + json);
-            if (!json.Contains("uniqueid")) return;
 
+            // Single scan: events without a uniqueid are not addressed to any
+            // device module and are skipped silently (previously a redundant
+            // Contains() pre-scan plus a separate extract pass).
             var uid = ExtractJsonStringValue(json, "uniqueid");
-            if (string.IsNullOrEmpty(uid))
-            {
-                Log("[GW] Could not extract uniqueid from: " +
-                    json.Substring(0, Math.Min(80, json.Length)));
-                return;
-            }
+            if (string.IsNullOrEmpty(uid)) return;
 
             DeConzBroker.DispatchUpdate(uid, json);
         }
@@ -479,7 +532,7 @@ namespace DeConzZigbee
             if (_intentionalDisconnect) return;
 
             Log(string.Format("[GW] Reconnecting in {0} s…", _reconnectMs / 1000));
-            if (_reconnectTimer != null) _reconnectTimer.Stop();
+            if (_reconnectTimer != null) { _reconnectTimer.Stop(); _reconnectTimer.Dispose(); }
             _reconnectTimer = new CTimer(_ =>
             {
                 _reconnectMs = Math.Min(_reconnectMs * 2, ReconnectMax);
@@ -489,8 +542,8 @@ namespace DeConzZigbee
 
         private void StopTimers()
         {
-            if (_aliveTimer    != null) { _aliveTimer.Stop();    _aliveTimer    = null; }
-            if (_reconnectTimer != null) { _reconnectTimer.Stop(); _reconnectTimer = null; }
+            if (_aliveTimer    != null) { _aliveTimer.Stop(); _aliveTimer.Dispose(); _aliveTimer = null; }
+            if (_reconnectTimer != null) { _reconnectTimer.Stop(); _reconnectTimer.Dispose(); _reconnectTimer = null; }
         }
 
         // ── Socket helpers ────────────────────────────────────────────────
@@ -544,7 +597,9 @@ namespace DeConzZigbee
 
             // Generate 4-byte masking key from the shared RNG (locked)
             var mask = new byte[4];
-            lock (_rng) { _rng.NextBytes(mask); }
+            _rngLock.Enter();
+            try { _rng.NextBytes(mask); }
+            finally { _rngLock.Leave(); }
 
             // Calculate header size
             int headerLen;
@@ -627,7 +682,9 @@ namespace DeConzZigbee
         private static string GenerateWebSocketKey()
         {
             var bytes = new byte[16];
-            lock (_rng) { _rng.NextBytes(bytes); }
+            _rngLock.Enter();
+            try { _rng.NextBytes(bytes); }
+            finally { _rngLock.Leave(); }
             return Convert.ToBase64String(bytes);
         }
 

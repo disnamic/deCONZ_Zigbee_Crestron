@@ -1,14 +1,49 @@
 ================================================================================
  DeConz Zigbee – Crestron SIMPL# Module Suite
- Version 4.1.0
- 2026-06-25
+ Version 4.2.0
+ 2026-06-26
 ================================================================================
 
-This feature release adds the missing LastAnnounced output to the last three
-modules, makes Get_State re-send static device info, introduces a global/local
-"permanent string re-assert" feature, and centralises the deCONZ API key on the
-Gateway. New wrapper signals shift the symbol layout, so the whole suite moves
-to the v4.1 symbol generation — see the sections below for the full history.
+This release adds the Keypad triple/treble press and an optional relative-rotary
+(scroll-wheel / dial) endpoint with a time-based level ramp, and folds in
+suite-wide library hardening for performance and memory. Only the Keypad symbol
+moves to the v4.2 generation; the other 13 modules keep their v4.1 symbols and
+stay compatible with the 4.2.0.0 library. See the sections below for the full
+history.
+
+--------------------------------------------------------------------------------
+ What is new in 4.2
+--------------------------------------------------------------------------------
+
+Keypad — triple/treble press, scroll-wheel rotary and rotary level ramp
+  (Keypad symbol only — moves to the v4.2 generation)
+  The Keypad gains a triple/treble press output (buttonevent 005), an optional
+  ZHARelativeRotary endpoint (Rotary_UniqueID) with CW/CCW pulses and rotation
+  feedback, and a time-based Level_fb ramp (0-65535 = 0-100%) for volume/dimmer
+  control with a Full_Scale_Seconds parameter and a Set_Level preset input. The
+  added parameters shift the keypad symbol layout, so its #SYMBOL_NAME and .usp
+  filename now carry "v4.2"; replace the v4.1 keypad symbol and re-check its
+  connections. The other 13 modules are unaffected.
+
+Library hardening (all modules — no wrapper/signal changes)
+  Performance and memory improvements in the shared library that change no
+  symbol, parameter or signal positions; existing v4.1 (and v4.2 Keypad) symbols
+  stay compatible.
+    - CTimers are now disposed (not just stopped) on teardown, releasing native
+      timer handles; the Gateway reconnect timer no longer leaks one timer per
+      reconnect.
+    - The Keypad rotary ramp timer halts when idle instead of waking the
+      processor continuously after the first rotation.
+    - The Gateway WebSocket frame buffer is offset/length based (O(n) instead of
+      O(n^2) reallocation) and recovers frame bytes coalesced with the handshake
+      response.
+    - The JSON parser avoids per-call substring allocations on the hot path, and
+      the shared RNGs use CCriticalSection.
+    - Per-event parsing skips the depth-2 state/config scan on heartbeat frames
+      that carry no state/config block (behaviour-preserving).
+
+Build
+  AssemblyVersion / AssemblyFileVersion 4.2.0.0.
 
 --------------------------------------------------------------------------------
  What is new in 4.1

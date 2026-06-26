@@ -171,7 +171,7 @@ namespace DeConzZigbee
         public void Dispose()
         {
             _permRun = false;
-            if (_staleTimer != null) { _staleTimer.Stop(); _staleTimer = null; }
+            if (_staleTimer != null) { _staleTimer.Stop(); _staleTimer.Dispose(); _staleTimer = null; }
             if (!_initialized) return;
             DeConzBroker.UnregisterDevice(_uniqueId, OnWsUpdate);
             DeConzBroker.UnregisterConnectedCallback(_uniqueId);
@@ -181,7 +181,7 @@ namespace DeConzZigbee
                 DeConzBroker.UnregisterConnectedCallback(_batteryUid);
             }
             StopOnlineTimer();
-            if (_pollTimer != null) { _pollTimer.Stop(); _pollTimer = null; }
+            if (_pollTimer != null) { _pollTimer.Stop(); _pollTimer.Dispose(); _pollTimer = null; }
             _initialized = false;
         }
 
@@ -345,8 +345,11 @@ namespace DeConzZigbee
             FireOnline(1);
             RestartOnlineTimer();
             if (_rawJsonEnabled) FireChunked(OnRawJsonFb, json);
-            ParseContactState(json);
-            ParseBattery(json);
+            if (DeConzJsonParser.HasStateOrConfig(json))
+            {
+                ParseContactState(json);
+                ParseBattery(json);
+            }
             ParseDeviceInfo(json);
         }
 
@@ -496,7 +499,7 @@ namespace DeConzZigbee
         private void StopOnlineTimer() 
         { 
             if (_onlineTimer == null) return;
-            _onlineTimer.Stop(); _onlineTimer = null; 
+            _onlineTimer.Stop(); _onlineTimer.Dispose(); _onlineTimer = null; 
         }
 
         private void FireOnline(ushort v) { Fire(OnOnline, v); }

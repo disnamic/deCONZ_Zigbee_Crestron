@@ -210,7 +210,7 @@ namespace DeConzZigbee
         public void Dispose()
         {
             _permRun = false;
-            if (_staleTimer != null) { _staleTimer.Stop(); _staleTimer = null; }
+            if (_staleTimer != null) { _staleTimer.Stop(); _staleTimer.Dispose(); _staleTimer = null; }
             if (!_initialized) return;
             if (!string.IsNullOrEmpty(_presenceUid)) { DeConzBroker.UnregisterDevice(_presenceUid, OnPresenceWs); DeConzBroker.UnregisterConnectedCallback(_presenceUid); }
             if (!string.IsNullOrEmpty(_lightUid))    { DeConzBroker.UnregisterDevice(_lightUid, OnLightWs);    DeConzBroker.UnregisterConnectedCallback(_lightUid); }
@@ -358,7 +358,8 @@ namespace DeConzZigbee
             ResolveAndBuild(json, _presLock, ref _presenceId, ref _presenceRes, ref _presenceUrl, ScheduleGetPresence);
             FireOnline(1); RestartOnlineTimer();
             if (_rawJsonEnabled) FireChunked(OnPresenceRawJson, json);
-            ParsePresence(json); ParseBattery(json); ParseDeviceInfo(json);
+            if (DeConzJsonParser.HasStateOrConfig(json)) { ParsePresence(json); ParseBattery(json); }
+            ParseDeviceInfo(json);
         }
 
         private void OnLightWs(string json)
@@ -367,7 +368,8 @@ namespace DeConzZigbee
             ResolveAndBuild(json, _lightLock, ref _lightId, ref _lightRes, ref _lightUrl, ScheduleGetLight);
             FireOnline(1); RestartOnlineTimer();
             if (_rawJsonEnabled) FireChunked(OnLightRawJson, json);
-            ParseLight(json); ParseBattery(json); ParseDeviceInfo(json);
+            if (DeConzJsonParser.HasStateOrConfig(json)) { ParseLight(json); ParseBattery(json); }
+            ParseDeviceInfo(json);
         }
 
         private void OnBatteryWs(string json)
@@ -376,7 +378,7 @@ namespace DeConzZigbee
             ResolveAndBuild(json, _battLock, ref _batteryId, ref _batteryRes, ref _batteryUrl, ScheduleGetBattery);
             FireOnline(1); RestartOnlineTimer();
             if (_rawJsonEnabled) FireChunked(OnBatteryRawJson, json);
-            ParseBattery(json);
+            if (DeConzJsonParser.HasStateOrConfig(json)) ParseBattery(json);
         }
 
         // ── JSON parsers ──────────────────────────────────────────────────
@@ -503,7 +505,7 @@ namespace DeConzZigbee
             if (_onlineTimer != null) _onlineTimer.Reset(_onlineTimeoutMs);
             else _onlineTimer = new CTimer(_ => { DebugLog("[Motion] Online timeout"); FireOnline(0); _staticInfoSent = false; }, null, _onlineTimeoutMs);
         }
-        private void StopOnlineTimer() { if (_onlineTimer == null) return; _onlineTimer.Stop(); _onlineTimer = null; }
+        private void StopOnlineTimer() { if (_onlineTimer == null) return; _onlineTimer.Stop(); _onlineTimer.Dispose(); _onlineTimer = null; }
         private void FireOnline(ushort v) { Fire(OnOnline, v); }
 
 

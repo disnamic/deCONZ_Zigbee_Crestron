@@ -156,7 +156,7 @@ namespace DeConzZigbee
         public void Dispose()
         {
             _permRun = false;
-            if (_staleTimer != null) { _staleTimer.Stop(); _staleTimer = null; }
+            if (_staleTimer != null) { _staleTimer.Stop(); _staleTimer.Dispose(); _staleTimer = null; }
             if (!_initialized) return;
             DeConzBroker.UnregisterDevice(_valveUid, OnValveWsUpdate);
             DeConzBroker.UnregisterDevice(_sensorUid, OnSensorWsUpdate);
@@ -387,7 +387,7 @@ namespace DeConzZigbee
             FireOnline(1);
             RestartOnlineTimer();
             if (_rawJsonEnabled) FireChunked(OnValveRawJson, json);
-            ParseValveState(json);
+            if (DeConzJsonParser.HasStateOrConfig(json)) ParseValveState(json);
             ParseDeviceInfo(json);
         }
 
@@ -421,7 +421,7 @@ namespace DeConzZigbee
             FireOnline(1);
             RestartOnlineTimer();
             if (_rawJsonEnabled) FireChunked(OnSensorRawJson, json);
-            ParseSensorState(json);
+            if (DeConzJsonParser.HasStateOrConfig(json)) ParseSensorState(json);
             ParseDeviceInfo(json);
         }
 
@@ -547,7 +547,7 @@ namespace DeConzZigbee
         private void StopOnlineTimer()
         {
             if (_onlineTimer == null) return;
-            _onlineTimer.Stop(); _onlineTimer = null;
+            _onlineTimer.Stop(); _onlineTimer.Dispose(); _onlineTimer = null;
         }
 
         private void FireOnline(ushort v) { Fire(OnOnline, v); }
