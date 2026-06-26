@@ -177,7 +177,7 @@ namespace DeConzZigbee
         public void Dispose()
         {
             _permRun = false;
-            if (_staleTimer != null) { _staleTimer.Stop(); _staleTimer = null; }
+            if (_staleTimer != null) { _staleTimer.Stop(); _staleTimer.Dispose(); _staleTimer = null; }
             if (!_initialized) return;
             DeConzBroker.UnregisterDevice(_uniqueId, OnWsUpdate);
             DeConzBroker.UnregisterConnectedCallback(_uniqueId);
@@ -187,7 +187,7 @@ namespace DeConzZigbee
                 DeConzBroker.UnregisterConnectedCallback(_batteryUid);
             }
             StopOnlineTimer();
-            if (_moveTimer != null) { _moveTimer.Stop(); _moveTimer = null; }
+            if (_moveTimer != null) { _moveTimer.Stop(); _moveTimer.Dispose(); _moveTimer = null; }
             _initialized = false;
         }
 
@@ -444,7 +444,7 @@ namespace DeConzZigbee
             FireOnline(1);
             RestartOnlineTimer();
             FireRawJson(json);
-            ParseState(json);
+            if (DeConzJsonParser.HasStateOrConfig(json)) ParseState(json);
             ParseDeviceInfo(json);
         }
 
@@ -475,7 +475,7 @@ namespace DeConzZigbee
             FireOnline(1);
             RestartOnlineTimer();
             if (_rawJsonEnabled) FireChunked(OnBatteryRawJson, json);
-            ParseBatteryState(json);
+            if (DeConzJsonParser.HasStateOrConfig(json)) ParseBatteryState(json);
         }
 
         // ── JSON parsers ──────────────────────────────────────────────────
@@ -500,7 +500,7 @@ namespace DeConzZigbee
                     {
                         _targetLift = -1;
                         Fire(OnMovingFb, 0);
-                        if (_moveTimer != null) { _moveTimer.Stop(); _moveTimer = null; }
+                        if (_moveTimer != null) { _moveTimer.Stop(); _moveTimer.Dispose(); _moveTimer = null; }
                     }
                 }
 
@@ -629,7 +629,7 @@ namespace DeConzZigbee
         private void StopOnlineTimer()
         {
             if (_onlineTimer == null) return;
-            _onlineTimer.Stop(); _onlineTimer = null;
+            _onlineTimer.Stop(); _onlineTimer.Dispose(); _onlineTimer = null;
         }
 
         private void FireOnline(ushort v) { Fire(OnOnline, v); }

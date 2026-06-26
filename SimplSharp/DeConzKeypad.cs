@@ -188,8 +188,13 @@ namespace DeConzZigbee
             {
                 _rampDir       = dir;
                 _lastRotaryUtc = DateTime.UtcNow;
+                // The ramp timer is reused across ramps: it ticks only while the
+                // wheel is turning and is stopped when idle (see RampTick) so it
+                // does not wake the system 20x/s forever after the first rotary.
                 if (_rampTimer == null)
                     _rampTimer = new CTimer(_ => RampTick(), null, RampTickMs, RampTickMs);
+                else
+                    _rampTimer.Reset(RampTickMs, RampTickMs);
             }
             finally { _rampLock.Leave(); }
         }
@@ -197,42 +202,56 @@ namespace DeConzZigbee
         private void StopRamp()
         {
             _rampLock.Enter();
-            try { _rampDir = 0; }
+            try
+            {
+                _rampDir = 0;
+                if (_rampTimer != null) _rampTimer.Stop();
+            }
             finally { _rampLock.Leave(); }
         }
 
         private void RampTick()
         {
-            int fire = -1;
+            int  fire = -1;
+            bool stop = false;
             _rampLock.Enter();
             try
             {
-                if (_rampDir == 0) return;
-                if ((DateTime.UtcNow - _lastRotaryUtc).TotalMilliseconds > MoveTimeoutMs)
+                if (_rampDir == 0)
+                {
+                    stop = true;
+                }
+                else if ((DateTime.UtcNow - _lastRotaryUtc).TotalMilliseconds > MoveTimeoutMs)
                 {
                     _rampDir = 0;   // no rotary event for a while → wheel stopped
-                    return;
+                    stop = true;
                 }
-                _levelRaw += _rampDir * (65535.0 / _fullScaleMs) * RampTickMs;
-                if      (_levelRaw < 0)     _levelRaw = 0;
-                else if (_levelRaw > 65535) _levelRaw = 65535;
-                fire = (int)Math.Round(_levelRaw);
+                else
+                {
+                    _levelRaw += _rampDir * (65535.0 / _fullScaleMs) * RampTickMs;
+                    if      (_levelRaw < 0)     _levelRaw = 0;
+                    else if (_levelRaw > 65535) _levelRaw = 65535;
+                    fire = (int)Math.Round(_levelRaw);
+                }
+                // Halt ticking when idle; StartRamp re-arms via Reset on the next
+                // rotary. Stop() under the lock is serialised against StartRamp.
+                if (stop && _rampTimer != null) _rampTimer.Stop();
             }
             finally { _rampLock.Leave(); }
-            FireLevel(fire);
+            if (!stop) FireLevel(fire);
         }
 
         public void Dispose()
         {
             _permRun = false;
-            if (_staleTimer != null) { _staleTimer.Stop(); _staleTimer = null; }
+            if (_staleTimer != null) { _staleTimer.Stop(); _staleTimer.Dispose(); _staleTimer = null; }
             if (!_initialized) return;
             DeConzBroker.UnregisterDevice(_uniqueId, OnWsUpdate);
             DeConzBroker.UnregisterConnectedCallback(_uniqueId);
             if (!string.IsNullOrEmpty(_rotaryUid)) DeConzBroker.UnregisterDevice(_rotaryUid, OnRotaryWs);
             StopOnlineTimer();
-            if (_pollTimer != null) { _pollTimer.Stop(); _pollTimer = null; }
-            if (_rampTimer != null) { _rampTimer.Stop(); _rampTimer = null; }
+            if (_pollTimer != null) { _pollTimer.Stop(); _pollTimer.Dispose(); _pollTimer = null; }
+            if (_rampTimer != null) { _rampTimer.Stop(); _rampTimer.Dispose(); _rampTimer = null; }
             _initialized = false;
         }
 
@@ -367,7 +386,9 @@ namespace DeConzZigbee
             SetOnline(1);
             RestartOnlineTimer();
             FireRawJson(json);
-            ParseStatus(json);        // battery + lowbattery
+            // Battery/lowbattery live in state/config; skip on pure heartbeat
+            // frames. Button parsing stays unconditional (critical, low cost).
+            if (DeConzJsonParser.HasStateOrConfig(json)) ParseStatus(json);
             ParseButtonEvent(json);   // button events – WS only, never from HTTP GET
             ParseDeviceInfo(json);    // lastseen, name, etc. from attr events
         }
@@ -536,7 +557,7 @@ namespace DeConzZigbee
         private void StopOnlineTimer()
         {
             if (_onlineTimer == null) return;
-            _onlineTimer.Stop(); _onlineTimer = null;
+            _onlineTimer.Stop(); _onlineTimer.Dispose(); _onlineTimer = null;
         }
 
         // ── Device info parser ────────────────────────────────────────────

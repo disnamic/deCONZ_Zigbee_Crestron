@@ -42,6 +42,7 @@ namespace DeConzZigbee
         // identical delays, defeating the stagger. The lock costs microseconds.
 
         private static readonly Random _sharedRng = new Random();
+        private static readonly CCriticalSection _rngLock = new CCriticalSection();
 
         /// <summary>
         /// Returns a random delay in [minMs, maxMs] milliseconds.
@@ -49,7 +50,25 @@ namespace DeConzZigbee
         /// </summary>
         public static int NextStaggerMs(int minMs = 1000, int maxMs = 15000)
         {
-            lock (_sharedRng) { return _sharedRng.Next(minMs, maxMs + 1); }
+            _rngLock.Enter();
+            try { return _sharedRng.Next(minMs, maxMs + 1); }
+            finally { _rngLock.Leave(); }
+        }
+
+        // ── Event gating ────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// True when the frame carries a "state" or "config" object, i.e. it may
+        /// hold device values worth parsing at depth 2. Pure top-level heartbeats
+        /// (e.g. a lastseen-only "changed" event) return false, letting callers
+        /// skip the depth-2 extract chains. A false positive only causes the
+        /// caller to parse as before, so the check is always safe.
+        /// </summary>
+        public static bool HasStateOrConfig(string json)
+        {
+            if (string.IsNullOrEmpty(json)) return false;
+            return json.IndexOf("\"state\"",  StringComparison.OrdinalIgnoreCase) >= 0
+                || json.IndexOf("\"config\"", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         // ── Boolean ───────────────────────────────────────────────────────────
@@ -62,8 +81,9 @@ namespace DeConzZigbee
         {
             int vp = FindValueStart(json, key, depth);
             if (vp < 0) return null;
-            if (vp + 4 <= json.Length && json.Substring(vp, 4) == "true")  return true;
-            if (vp + 5 <= json.Length && json.Substring(vp, 5) == "false") return false;
+            // Ordinal range compare – no substring allocation (hot path).
+            if (vp + 4 <= json.Length && string.CompareOrdinal(json, vp, "true",  0, 4) == 0) return true;
+            if (vp + 5 <= json.Length && string.CompareOrdinal(json, vp, "false", 0, 5) == 0) return false;
             return null;
         }
 
@@ -85,9 +105,16 @@ namespace DeConzZigbee
             int ep = vp;
             while (ep < json.Length && char.IsDigit(json[ep])) ep++;
 
-            int val;
-            if (!int.TryParse(json.Substring(vp, ep - vp), out val)) return null;
-            return neg ? -val : val;
+            // Manual accumulation – no substring allocation (hot path). A long
+            // accumulator with a range guard keeps deCONZ values (always within
+            // int range) safe without int.TryParse's intermediate string.
+            long val = 0;
+            for (int i = vp; i < ep; i++)
+            {
+                val = val * 10 + (json[i] - '0');
+                if (val > int.MaxValue) return null;   // out of range
+            }
+            return neg ? (int)(-val) : (int)val;
         }
 
         // ── String ────────────────────────────────────────────────────────────

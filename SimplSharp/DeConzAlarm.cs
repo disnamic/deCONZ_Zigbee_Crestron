@@ -134,7 +134,7 @@ namespace DeConzZigbee
         public void Dispose()
         {
             _permRun = false;
-            if (_staleTimer != null) { _staleTimer.Stop(); _staleTimer = null; }
+            if (_staleTimer != null) { _staleTimer.Stop(); _staleTimer.Dispose(); _staleTimer = null; }
             if (!_initialized) return;
             for (int i = 0; i < 4; i++)
                 if (!string.IsNullOrEmpty(_uids[i]))
@@ -234,37 +234,53 @@ namespace DeConzZigbee
 
         private void DispatchPayload(int slot, string json)
         {
+            // Depth-2 value fields only exist when a state/config block is present;
+            // skip them on pure heartbeat frames. Raw JSON and top-level identity
+            // (lastseen/static info) are still emitted below.
+            bool hasData = DeConzJsonParser.HasStateOrConfig(json);
             switch (slot)
             {
                 case SlotAlarm:
                     if (_rawJsonEnabled) FireChunked(OnAlarmRawJson, json);
-                    bool? alarm = DeConzJsonParser.ExtractBool(json, "alarm", 2);
-                    if (alarm.HasValue) Fire(OnAlarmFb, alarm.Value ? (ushort)1 : (ushort)0);
+                    if (hasData)
+                    {
+                        bool? alarm = DeConzJsonParser.ExtractBool(json, "alarm", 2);
+                        if (alarm.HasValue) Fire(OnAlarmFb, alarm.Value ? (ushort)1 : (ushort)0);
+                    }
                     break;
                 case SlotFire:
                     if (_rawJsonEnabled) FireChunked(OnFireRawJson, json);
-                    bool? fire = DeConzJsonParser.ExtractBool(json, "fire", 2);
-                    if (fire.HasValue) Fire(OnFireFb, fire.Value ? (ushort)1 : (ushort)0);
+                    if (hasData)
+                    {
+                        bool? fire = DeConzJsonParser.ExtractBool(json, "fire", 2);
+                        if (fire.HasValue) Fire(OnFireFb, fire.Value ? (ushort)1 : (ushort)0);
+                    }
                     break;
                 case SlotCO:
                     if (_rawJsonEnabled) FireChunked(OnCORawJson, json);
-                    bool? co = DeConzJsonParser.ExtractBool(json, "carbonmonoxide", 2);
-                    if (co.HasValue) Fire(OnCarbonMonoxideFb, co.Value ? (ushort)1 : (ushort)0);
+                    if (hasData)
+                    {
+                        bool? co = DeConzJsonParser.ExtractBool(json, "carbonmonoxide", 2);
+                        if (co.HasValue) Fire(OnCarbonMonoxideFb, co.Value ? (ushort)1 : (ushort)0);
+                    }
                     break;
                 case SlotBattery:
                     if (_rawJsonEnabled) FireChunked(OnBatteryRawJson, json);
                     break;
             }
-            // Shared fields across all slots
-            bool? tamp = DeConzJsonParser.ExtractBool(json, "tampered", 2);
-            if (tamp.HasValue) Fire(OnTamperedFb, tamp.Value ? (ushort)1 : (ushort)0);
+            // Shared fields across all slots (depth-2 → gated)
+            if (hasData)
+            {
+                bool? tamp = DeConzJsonParser.ExtractBool(json, "tampered", 2);
+                if (tamp.HasValue) Fire(OnTamperedFb, tamp.Value ? (ushort)1 : (ushort)0);
 
-            int? bat = DeConzJsonParser.ExtractInt(json, "battery", 2);
-            if (bat.HasValue) Fire(OnBatteryLevel, (ushort)Math.Max(0, Math.Min(100, bat.Value)));
-            bool? low = DeConzJsonParser.ExtractBool(json, "lowbattery", 2);
-            if (low.HasValue) Fire(OnBatteryLow, low.Value ? (ushort)1 : (ushort)0);
-            int? v = DeConzJsonParser.ExtractInt(json, "voltage", 2);
-            if (v.HasValue) Fire(OnVoltageFb, (ushort)Math.Max(0, Math.Min(65535, v.Value)));
+                int? bat = DeConzJsonParser.ExtractInt(json, "battery", 2);
+                if (bat.HasValue) Fire(OnBatteryLevel, (ushort)Math.Max(0, Math.Min(100, bat.Value)));
+                bool? low = DeConzJsonParser.ExtractBool(json, "lowbattery", 2);
+                if (low.HasValue) Fire(OnBatteryLow, low.Value ? (ushort)1 : (ushort)0);
+                int? v = DeConzJsonParser.ExtractInt(json, "voltage", 2);
+                if (v.HasValue) Fire(OnVoltageFb, (ushort)Math.Max(0, Math.Min(65535, v.Value)));
+            }
 
             string ls = DeConzJsonParser.ExtractTopLevelString(json, "lastseen");
             if (ls != null) FireStr(OnLastSeenFb, ls);
@@ -317,7 +333,7 @@ namespace DeConzZigbee
             if (_onlineTimer != null) _onlineTimer.Reset(_onlineTimeoutMs);
             else _onlineTimer = new CTimer(_ => { DebugLog("[Alarm] Online timeout"); FireOnline(0); _staticInfoSent = false; }, null, _onlineTimeoutMs);
         }
-        private void StopOnlineTimer() { if (_onlineTimer == null) return; _onlineTimer.Stop(); _onlineTimer = null; }
+        private void StopOnlineTimer() { if (_onlineTimer == null) return; _onlineTimer.Stop(); _onlineTimer.Dispose(); _onlineTimer = null; }
         private void FireOnline(ushort v) { Fire(OnOnline, v); }
 
 

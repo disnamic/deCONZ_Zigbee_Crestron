@@ -163,7 +163,7 @@ namespace DeConzZigbee
         public void Dispose()
         {
             _permRun = false;
-            if (_staleTimer != null) { _staleTimer.Stop(); _staleTimer = null; }
+            if (_staleTimer != null) { _staleTimer.Stop(); _staleTimer.Dispose(); _staleTimer = null; }
             if (!_initialized) return;
             if (!string.IsNullOrEmpty(_switchUid)) { DeConzBroker.UnregisterDevice(_switchUid, OnSwitchWs); DeConzBroker.UnregisterConnectedCallback(_switchUid); }
             if (!string.IsNullOrEmpty(_powerUid))  { DeConzBroker.UnregisterDevice(_powerUid, OnPowerWs);   DeConzBroker.UnregisterConnectedCallback(_powerUid); }
@@ -307,7 +307,8 @@ namespace DeConzZigbee
             }
             FireOnline(1); RestartOnlineTimer();
             if (_rawJsonEnabled) FireChunked(OnSwitchRawJson, json);
-            ParseSwitch(json); ParseBattery(json); ParseDeviceInfo(json);
+            if (DeConzJsonParser.HasStateOrConfig(json)) { ParseSwitch(json); ParseBattery(json); }
+            ParseDeviceInfo(json);
         }
 
         private void OnPowerWs(string json)
@@ -316,7 +317,8 @@ namespace DeConzZigbee
             ResolveUrl(json, _pwLock, ref _powerId, ref _powerRes, ref _powerUrl, "sensors", ScheduleGetPower);
             FireOnline(1); RestartOnlineTimer();
             if (_rawJsonEnabled) FireChunked(OnPowerRawJson, json);
-            ParsePower(json); ParseBattery(json); ParseDeviceInfo(json);
+            if (DeConzJsonParser.HasStateOrConfig(json)) { ParsePower(json); ParseBattery(json); }
+            ParseDeviceInfo(json);
         }
 
         private void OnConsWs(string json)
@@ -325,7 +327,8 @@ namespace DeConzZigbee
             ResolveUrl(json, _consLock, ref _consId, ref _consRes, ref _consUrl, "sensors", ScheduleGetCons);
             FireOnline(1); RestartOnlineTimer();
             if (_rawJsonEnabled) FireChunked(OnConsumptionRawJson, json);
-            ParseCons(json); ParseBattery(json); ParseDeviceInfo(json);
+            if (DeConzJsonParser.HasStateOrConfig(json)) { ParseCons(json); ParseBattery(json); }
+            ParseDeviceInfo(json);
         }
 
         private void ResolveUrl(string json, CCriticalSection lk,
@@ -453,7 +456,7 @@ namespace DeConzZigbee
             if (_onlineTimer != null) _onlineTimer.Reset(_onlineTimeoutMs);
             else _onlineTimer = new CTimer(_ => { DebugLog("[Power] Online timeout"); FireOnline(0); _staticInfoSent = false; }, null, _onlineTimeoutMs);
         }
-        private void StopOnlineTimer() { if (_onlineTimer == null) return; _onlineTimer.Stop(); _onlineTimer = null; }
+        private void StopOnlineTimer() { if (_onlineTimer == null) return; _onlineTimer.Stop(); _onlineTimer.Dispose(); _onlineTimer = null; }
         private void FireOnline(ushort v) { Fire(OnOnline, v); }
 
 

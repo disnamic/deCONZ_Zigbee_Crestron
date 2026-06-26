@@ -162,7 +162,7 @@ namespace DeConzZigbee
         public void Dispose()
         {
             _permRun = false;
-            if (_staleTimer != null) { _staleTimer.Stop(); _staleTimer = null; }
+            if (_staleTimer != null) { _staleTimer.Stop(); _staleTimer.Dispose(); _staleTimer = null; }
             if (!_initialized) return;
             for (int i = 0; i < 4; i++)
             {
@@ -338,6 +338,13 @@ namespace DeConzZigbee
         {
             try
             {
+                // Heartbeat frames without a state/config block carry no slot value
+                // nor battery; only the top-level lastseen is still worth updating.
+                if (!DeConzJsonParser.HasStateOrConfig(json))
+                {
+                    ParseDeviceInfo(json);
+                    return;
+                }
                 switch (slot)
                 {
                     case SlotTemp:
@@ -493,7 +500,7 @@ namespace DeConzZigbee
         private void StopOnlineTimer()
         {
             if (_onlineTimer == null) return;
-            _onlineTimer.Stop(); _onlineTimer = null;
+            _onlineTimer.Stop(); _onlineTimer.Dispose(); _onlineTimer = null;
         }
 
         private void FireOnline(ushort v) { Fire(OnOnline, v); }

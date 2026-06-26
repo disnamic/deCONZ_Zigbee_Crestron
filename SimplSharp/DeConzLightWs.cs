@@ -150,7 +150,7 @@ namespace DeConzZigbee
         public void Dispose()
         {
             _permRun = false;
-            if (_staleTimer != null) { _staleTimer.Stop(); _staleTimer = null; }
+            if (_staleTimer != null) { _staleTimer.Stop(); _staleTimer.Dispose(); _staleTimer = null; }
             if (!_initialized) return;
             DeConzBroker.UnregisterDevice(_uniqueId, OnWsUpdate);
             DeConzBroker.UnregisterConnectedCallback(_uniqueId);
@@ -161,6 +161,7 @@ namespace DeConzZigbee
                 if (_brightnessTimer != null)
                 {
                     _brightnessTimer.Stop();
+                    _brightnessTimer.Dispose();
                     _brightnessTimer = null;
                 }
             }
@@ -380,7 +381,7 @@ namespace DeConzZigbee
             FireOnline(1);
             RestartOnlineTimer();
             FireRawJson(json);
-            ParseAndFire(json);
+            if (DeConzJsonParser.HasStateOrConfig(json)) ParseAndFire(json);
             // deCONZ also pushes "attr" events over WS carrying lastseen,
             // lastannounced, name, swversion etc. Parse them here too so these
             // feedbacks are not limited to the HTTP GET response.
@@ -465,7 +466,7 @@ namespace DeConzZigbee
                     _briLock.Enter();
                     try
                     {
-                        if (_brightnessTimer != null) { _brightnessTimer.Stop(); _brightnessTimer = null; }
+                        if (_brightnessTimer != null) { _brightnessTimer.Stop(); _brightnessTimer.Dispose(); _brightnessTimer = null; }
                         _brightnessTimer = new CTimer(_ => Fire(OnBrightnessFb, feedback),
                                                      null, 600);
                     }
@@ -562,7 +563,7 @@ namespace DeConzZigbee
         private void StopOnlineTimer()
         {
             if (_onlineTimer == null) return;
-            _onlineTimer.Stop(); _onlineTimer = null;
+            _onlineTimer.Stop(); _onlineTimer.Dispose(); _onlineTimer = null;
         }
 
         private void FireOnline(ushort v) { Fire(OnOnline, v); }
