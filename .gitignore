@@ -35,8 +35,11 @@ SPlsWork/
 CLAUDE.md
 HANDOVER.md
 
-# Simpl program/ is the packaged demo deliverable — track it in full,
-# overriding the build-artifact filters above (.clz/.ush/.lpz/.sig/...).
+# Local logic tests with Crestron stubs and real gateway data.
+Tests/
+
+# Simpl program/ is the packaged demo deliverable: track the library and the
+# wrappers, overriding the build-artifact filters above (.clz/.ush).
 !Simpl program/
 !Simpl program/**
 
@@ -45,3 +48,16 @@ Simpl program/SPlsWork/
 Simpl program/*.ASV
 Simpl program/*.sm2
 Simpl program/*_archive.zip
+
+# Compiled demo programs hold the parameter values they were built with, and a
+# program saved in SIMPL Windows holds the real API key, address and uniqueids.
+# Neither belongs in a public repository. Compiled artefacts stay local. A demo
+# .smw is added deliberately (git add -f) after its parameter values have been
+# replaced with placeholders; demo programs already tracked stay tracked.
+Simpl program/*.lpz
+Simpl program/*.lpz.hash
+Simpl program/*.sig
+Simpl program/*.smft
+Simpl program/*.arcv
+Simpl program/*_compiled.zip
+Simpl program/*.smw
